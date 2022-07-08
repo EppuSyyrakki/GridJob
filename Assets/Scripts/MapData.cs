@@ -17,7 +17,7 @@ namespace Jobben
         [SerializeField, Range(0.1f, 0.5f), Tooltip("Size of the Boxcast that tries to detect obstacles inside nodes.")]
         public float obstacleCastRadius;
         [SerializeField, Header("Layer info")]
-        public LayerMask obstacle, terrain, climbable;
+        public LayerMask obstacleLayer, terrainLayer, climbLayer, structureLayer;
 
         [HideInInspector]
         public Vector3 transformPosition;

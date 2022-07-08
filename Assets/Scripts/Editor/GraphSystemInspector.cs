@@ -45,7 +45,7 @@ namespace Jobben
 			mousePos.x *= ppp;
 			Ray ray = scene.camera.ScreenPointToRay(mousePos);
 
-			if (Physics.Raycast(ray, out var hit, 100f, gs.Graph.Data.terrain))
+			if (Physics.Raycast(ray, out var hit, 100f, gs.Graph.Data.terrainLayer))
 			{
 				Tile t = gs.Graph.WorldToNode(hit.point);   // Find the tile that was clicked
 

@@ -87,10 +87,7 @@ namespace Jobben
 
                 for (int i = 0; i < jobCount; i++)
                 {
-                    if (ScheduleJob(new Tile(11, 2, 3), target, i))
-                    {
-                        // TODO: Something?
-                    }
+                    ScheduleJob(new Tile(0, 1, 0), target, i);
                 }
 
                 scheduled = true;
@@ -220,22 +217,27 @@ namespace Jobben
             LoadGraph();
         }
 
-        [ContextMenu("Auto setup node connections", false, 0)]
-        private void AutoSetup()
-        {
-            Graph.AutoBuild();           
-        }
-
-        [ContextMenu("Generate new from this data", false, 1)]
+        [ContextMenu("Generate new from this data", false, 0)]
         private void GenerateGraph()
         {
             Graph = new Graph(data, true);
         }
 
-        [ContextMenu("Save graph to asset and reload", false, 2)]
+        [ContextMenu("Auto setup node connections", false, 1)]
+        private void AutoSetup()
+        {
+            Graph.AutoBuild();           
+        }  
+
+        [ContextMenu("Save graph to asset", false, 2)]
         private void Save()
         {
             asset.SaveToAsset(Graph.Tiles, Graph.Data);
+        }
+
+        [ContextMenu("Force Load graph from asset", false, 3)]
+        private void Load()
+        {
             LoadGraph();
         }
     }

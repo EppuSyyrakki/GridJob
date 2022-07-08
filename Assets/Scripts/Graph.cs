@@ -71,9 +71,11 @@ namespace Jobben
 
 		/*	Auto build notes:
 		 *	1. Loop all nodes 
-		 *		1.1. Raycast each for Terrain layer. Set Edges.None and TileType.Terrain to blocked tiles.
-		 *		1.2. Add current to blocked list.
+		 *		1.1. Raycast each for layers terrain, obstacle, climb, structure, whatever. 
+		 *		1.2. if blocked, Set Edges.None and TileType.Terrain to blocked tiles. Add current to blocked list.
 		 *		1.3. Disable Edge.Down from above (if exists)
+		 *		1.4. if climbable and above exists, Add Edge.Up
+		 *		1.5. scan lateral neighbors for first hit, add that as edge to up neighbor
 		 *	2. Iterate blocked list
 		 *	3. If node.data.y < data.size.y - 1 (below highest level), do: 
 		 *		3.1. Get current + Node.up if it's not in the blocked nodes list
@@ -84,30 +86,55 @@ namespace Jobben
 		 *	4. Assign from blocked list to nodes[]
 		*/
 
+		// TODO: Make a real-time Job out of this
+
+		//public void AutoBuildAlt()
+  //      {
+		//	var blockedList = new List<Tile>(tiles.Length / 2);
+
+		//	for (int i = 0; i < tiles.Length; i++)  // 1.
+		//	{
+		//		Tile tile = tiles[i];
+		//		LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.obstacleLayer;
+
+		//		if (BoxcastTile(tile, Data, ref layers, includeTriggers: true)) // 1.1
+		//		{
+		//			if (layers == Data.terrainLayer)
+		//			{
+		//				tile = HandleTerrain(blockedList, tile); // 1.2 and 1.3
+		//			}
+		//			else if (layers == Data.climbLayer)
+		//			{
+		//				tile = HandleClimb(tile); // 1.4 and 1.5
+		//			}
+		//		}
+
+		//		tiles[i] = tile;
+		//	}
+		//}
+
 		public void AutoBuild()
         {
 			var blockedList = new List<Tile>(tiles.Length / 2);
 
 			for (int i = 0; i < tiles.Length; i++)	// 1.
 			{
-				Tile t = tiles[i];
-				//t = EmptyEdges(t, Data);	// Perhaps not needed here as the Constructor already does this
+				Tile tile = tiles[i];
+				LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.obstacleLayer;
 
-				if (BoxcastTile(t, Data, Data.terrain))	// 1.1
+				if (BoxcastTile(tile, Data, ref layers, includeTriggers: true))	// 1.1
 				{ 
-					t.SetEdges(Edge.None);
-					t.SetType(TileType.Terrain);
-					blockedList.Add(t);	// 1.2
-
-					if (HasTile(t + Tile.up, Data)) // 1.3
-					{
-						Tile above = tiles[CalculateIndex(t + Tile.up, Data.size)];
-						above.RemoveEdges(Edge.Down);	
-						tiles[above.index] = above;
+					if (layers == Data.terrainLayer)
+                    {
+                        tile = HandleTerrain(blockedList, tile); // 1.2 and 1.3
                     }
-				}
+                    else if (layers == Data.climbLayer)
+                    {
+                        tile = HandleClimb(tile); // 1.4 and 1.5
+                    }
+                }
 
-				tiles[i] = t;
+				tiles[i] = tile;
 			}
 
             for (int i = 0; i < tiles.Length; i++)
@@ -124,13 +151,13 @@ namespace Jobben
                 {
 					if (blockedList.Contains(t + Tile.up)) { continue; }
 
-					Tile above = tiles[CalculateIndex(t + Tile.up, Data.size)];  // 3.1					
+					Tile above = tiles[CalculateIndex(t + Tile.up, Data)];  // 3.1					
                     
 					for (int i = 0; i < laterals.Length; i++)
                     {
 						if (HasTile(above + laterals[i], Data) && !blockedList.Contains(above + laterals[i]))	// 3.2
 						{
-							Tile aboveNeighbor = tiles[CalculateIndex(above + laterals[i], Data.size)];
+							Tile aboveNeighbor = tiles[CalculateIndex(above + laterals[i], Data)];
 							above.AddEdges(Tile.DirectionToEdge(laterals[i]));	// 3.3
 
 							if (aboveNeighbor.HasEdge(Edge.Down)) { continue; }
@@ -145,10 +172,51 @@ namespace Jobben
             }
 		}
 
-		/// <summary>
-		/// Disables edges at size limits, all up edges, and all lateral edges when y > 0.
-		/// </summary>
-		private static Tile EmptyEdges(Tile t, MapData data)
+        private Tile HandleClimb(Tile tile)
+        {
+            tile.SetType(TileType.Climb);
+
+            if (HasTile(tile + Tile.up, Data))
+            {
+                Tile above = tiles[CalculateIndex(tile + Tile.up, Data)];
+                var directions = Tile.Directions_Direct;
+
+                for (int i = 0; i < directions.Length; i++)
+                {
+                    LayerMask layer = Data.terrainLayer | Data.structureLayer;
+
+                    if (BoxcastTile(tile + directions[i], Data, ref layer))
+                    {
+                        Edge edge = Tile.DirectionToEdge(directions[i]);
+                        above.AddEdges(edge);
+                        tiles[above.index] = above;
+                    }
+                }
+            }
+
+			return tile;
+        }
+
+        private Tile HandleTerrain(List<Tile> blockedList, Tile tile)
+        {
+            tile.SetEdges(Edge.None);
+            tile.SetType(TileType.Terrain);
+            blockedList.Add(tile); 
+
+            if (HasTile(tile + Tile.up, Data)) 
+            {
+                Tile above = tiles[CalculateIndex(tile + Tile.up, Data)];
+                above.RemoveEdges(Edge.Down);
+                tiles[above.index] = above;
+            }
+
+            return tile;
+        }
+
+        /// <summary>
+        /// Disables edges at size limits, all up edges, and all lateral edges when y > 0.
+        /// </summary>
+        private static Tile EmptyEdges(Tile t, MapData data)
         {
 			int3 i = t.data;
 			t.RemoveEdges(Edge.Up);
@@ -178,7 +246,7 @@ namespace Jobben
 			for (int i = 0; i < directions.Length; i++)
             {
 				Tile candidate = t + directions[i];
-				int index = CalculateIndex(candidate, data.size);
+				int index = CalculateIndex(candidate, data);
 
 				if (!t.HasEdgeTo(candidate) || index < 0 || index > data.Length
 					|| (directions[i].Equals(Tile.down) && tiles[index].Type != TileType.Terrain))  
@@ -199,20 +267,18 @@ namespace Jobben
 		/// Uses Physics.CheckBox to detect anything on given layers in the node's world position. 
 		/// NOTE: SHOULD NOT BE USED INSIDE JOBS.
 		/// </summary>
-		private static bool BoxcastTile(Tile t, MapData data, LayerMask layers, bool includeTriggers = false, bool debug = false)
+		private static bool BoxcastTile(Tile t, MapData data, ref LayerMask layers, bool includeTriggers = false)
 		{
 			var pos = TileToWorld(t, data) + Vector3.up * data.cellSize.y * 0.5f;
-			var halfExtents = data.cellSize * data.obstacleCastRadius;
+			var radius = data.cellSize * data.obstacleCastRadius;
 			var interaction = includeTriggers ? QueryTriggerInteraction.Collide : QueryTriggerInteraction.Ignore;
 
-			if (Physics.CheckBox(pos, halfExtents, Quaternion.identity, layers, interaction))
-			{
-				if (debug) { Debug.DrawLine(pos, pos + Vector3.up, Color.red, 10f);  }
-
+			if (Physics.BoxCast(pos, radius, Vector3.up, out RaycastHit hit, Quaternion.identity, 0.05f, layers, interaction))
+            {
+				layers = hit.collider.gameObject.layer;
 				return true;
 			}
 
-			if (debug) { Debug.DrawLine(pos, pos + Vector3.up, Color.green, 10f); }
 			return false;
 		}
 
@@ -249,8 +315,9 @@ namespace Jobben
         {
 			Vector3 local = worldPos - Data.transformPosition;
 			Vector3 scaled = new Vector3(local.x / Data.cellSize.x, local.y / Data.cellSize.y, local.z / Data.cellSize.z);
-			int3 location = new int3((int)scaled.x, (int)math.round(scaled.y), (int)scaled.z);
-			return HasTile(location, Data.size) ? tiles[CalculateIndex(location, Data.size)] : Tile.MaxValue;
+			int3 coord = new int3((int)scaled.x, (int)math.round(scaled.y), (int)scaled.z);
+			Tile tile = new Tile(coord);
+			return HasTile(tile, Data.size) ? tiles[CalculateIndex(tile, Data)] : Tile.MaxValue;
 		}
 
 		public void Set(Tile[] tiles, MapData data)
@@ -296,20 +363,22 @@ namespace Jobben
 				+ math.abs(dist.y * height);
         }
 
+		public static int CalculateIndex(Tile t, MapData data)
+        {
+			return CalculateIndex(t.data.x, t.data.y, t.data.z, data.size);
+		}
+
         public static int CalculateIndex(Tile t, int3 size)
         {
-			return CalculateIndex(t.data.x, t.data.y, t.data.z, size);
-		}
+            return CalculateIndex(t.data.x, t.data.y, t.data.z, size);
+        }
 
-        public static int CalculateIndex(int3 i, int3 size)
-        {
-			return CalculateIndex(i.x, i.y, i.z, size);
-		}
-
-		public static int CalculateIndex(int x, int y, int z, int3 size)
+        private static int CalculateIndex(int x, int y, int z, int3 size)
 		{
 			// return (z << (size.x + size.y)) + (y << size.x) + x;
-			return (z * size.x * size.y) + (y * size.x) + x; // Unoptimized version, can be used with non-n^2 grids.
+			int value = (z * size.x * size.y) + (y * size.x) + x; // Unoptimized version, can be used with non-n^2 grids.
+			if (value < 0 || value > size.x * size.y * size.z) { return -1; }
+			return value;
 		}
 
 		public static bool HasTile(Tile t, MapData data)

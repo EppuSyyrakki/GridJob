@@ -16,8 +16,8 @@ namespace Jobben
         NorthWest = 1 << 7,
         Up = 1 << 8,
         Down = 1 << 9,
-        AllSameLevel = 1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 7,
-        All = 1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 8 | 1 << 9
+        AllSameLevel = North | East | South | West | NorthEast | SouthEast | SouthWest | NorthWest,
+        All = North | East | South | West | NorthEast | SouthEast | SouthWest | NorthWest | Up | Down,
     }
 
     public enum TileType : byte
@@ -25,6 +25,6 @@ namespace Jobben
         Empty = 0,
         Terrain = 1,
         Obstacle = 2,
-        Climbable = 3
+        Climb = 3
     }
 }

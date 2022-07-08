@@ -61,7 +61,7 @@ namespace Jobben
                 Tile tile = tiles[i];
                 int hitLayer = hit.collider.gameObject.layer;
 
-                if (((1 << hitLayer) | data.terrain) > 1)
+                if (((1 << hitLayer) | data.terrainLayer) > 1)
                 {
                     tile.SetEdges(Edge.None);
 
@@ -84,7 +84,7 @@ namespace Jobben
                 Tile tile = tiles[i];
                 int hitLayer = hit.collider.gameObject.layer;
 
-                if (((1 << hitLayer) | data.terrain) > 1) { tile.SetEdges(Edge.None); }
+                if (((1 << hitLayer) | data.terrainLayer) > 1) { tile.SetEdges(Edge.None); }
 
                 result[i] = tile;
             }

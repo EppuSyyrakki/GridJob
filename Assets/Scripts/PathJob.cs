@@ -34,7 +34,7 @@ namespace Jobben
             this.goal = goal;
             this.tiles = tiles;
             this.result = result;
-            frontierSize = data.size.x * data.size.y * data.size.z / 10;
+            frontierSize = data.size.x * data.size.y * data.size.z / 32;
             this.log = log;            
         }
 
@@ -56,7 +56,7 @@ namespace Jobben
             Tile current = begin;
             cameFrom[current.index] = current.index;
             costSoFar[current.index] = 0;
-            frontier.Insert(current);  // The frontier should sort nodes by their Manhattan distance shortest to longest.           
+            frontier.Insert(current);  // The frontier sorts nodes by their Manhattan distance shortest to longest with TileCompare.           
 
             while (frontier.Count > 0)  // Still have nodes to search.
             {
@@ -121,7 +121,7 @@ namespace Jobben
         /// <summary>
         /// Returns only valid (movable) neighbor copies from the grid. Checks for node edges and grid limits.
         /// </summary>
-        private NativeList<Tile> GetNeighbors(Tile t)
+        private NativeList<Tile> GetNeighbors(Tile tile, int dropDepth = 2)
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
@@ -133,10 +133,21 @@ namespace Jobben
             for (int i = 0; i < directions.Length; i++)
             {
                 Edge current = (Edge)(1 << i);
-                Tile neighbor = t + directions[i];
+                Tile neighbor = tile + directions[i];
 
-                if (HasTile(neighbor) && t.HasEdge(current) && !t.occupied)
+                // if (HasTile(neighbor) && t.HasEdge(current) && !t.occupied) For posterity.
+                // Manage with just checking the edge and relying on setting them up accurately.
+                if (tile.HasEdge(current) && !tile.occupied)
                 {
+                    //if (directions[i].Equals(Tile.down))    // If going down, dont allow more than dropDepth steps
+                    //{
+                    //    for (int j = 1; j < dropDepth; j++)
+                    //    {
+                    //        int indexOfDrop = Graph.CalculateIndex(tile + directions[i] * j, data.size);                           
+                    //        if (indexOfDrop > -1) { continue; }
+                    //    }
+                    //}
+
                     var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
                     neighbors.Add(validNeighbor);
                 }
