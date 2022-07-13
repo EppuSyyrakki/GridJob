@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben
+namespace Jobben.Jobs
 {
     public class GraphUpdater
     {
@@ -65,9 +65,9 @@ namespace Jobben
                 {
                     tile.SetEdges(Edge.None);
 
-                    if (Graph.HasTile(tile + Tile.up, data.size))
+                    if (Graph.CalculateIndex(tile + Tile.up, data, out int upIndex))
                     {
-                        Tile above = tiles[Graph.CalculateIndex(tile + Tile.up, data.size)];
+                        Tile above = tiles[upIndex];
                         // TODO: Something?
                     }
                 }

@@ -131,6 +131,14 @@ namespace Unity.Collections {
             }
         }
 
+        public U Comparator
+        {
+            set
+            {
+                _comparator = value;
+            }
+        }
+
         /// <summary>
         /// Constructs a new NativeHeap using the given Allocator.  You must call Dispose on this collection
         /// when you are finished with it.

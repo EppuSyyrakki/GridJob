@@ -11,7 +11,7 @@ namespace Jobben
         [SerializeField]
         public int3 data;
         [SerializeField]
-        private TileType type;
+        private TileType types;
         [SerializeField]
         public Edge edges;
         [SerializeField]
@@ -20,7 +20,7 @@ namespace Jobben
         public int index;
 
         #region Properties
-        public TileType Type => type;
+        public TileType Type => types;
         public Edge Edges => edges;
         public static Tile MaxValue { get { return new Tile(int.MaxValue, int.MaxValue, int.MaxValue); } }
         #endregion
@@ -29,7 +29,7 @@ namespace Jobben
         public Tile(int x, int y, int z, Edge edges = (Edge)ushort.MaxValue, TileType type = 0, bool occupied = false, int index = -1)
         {
             data = new int3(x, y, z);
-            this.type = type;
+            this.types = type;
             this.edges = edges;
             this.occupied = occupied;
             this.index = index;
@@ -38,20 +38,24 @@ namespace Jobben
         public Tile(int3 data, Edge edges = (Edge)ushort.MaxValue, TileType type = 0, bool occupied = false, int index = -1)
         {
             this.data = data;
-            this.type = type;
+            this.types = type;
             this.edges = edges;
             this.occupied = occupied;
             this.index = index;
         }
         #endregion
 
-        #region Tile, Type and Edge operations
-        public void SetType(TileType type) { this.type = type; }
-        public void AddEdges(Edge other) { edges |= other; }
-        public void RemoveEdges(Edge other) { edges &= ~other; }
-        public void ToggleEdges(Edge other) { edges ^= other; }
-        public void SetEdges(Edge other) { edges = other; }
-        public bool HasEdge(Edge e) { return (Edges & e) > 0; }
+        #region Tile, Type and Edge operations        
+        public void SetType(TileType t) { types = t; }
+        public void AddType(TileType t) { types |= t; }
+        public void RemoveType(TileType t) { types &= ~t; }
+        /// <summary> Returns true if tile has any same flags set as param types. </summary>
+        public bool IsAnyType(TileType types) { return (types & this.types) > 0; }
+        public void SetEdges(Edge e) { edges = e; }
+        public void AddEdges(Edge e) { edges |= e; }
+        public void RemoveEdges(Edge e) { edges &= ~e; }
+        public void ToggleEdges(Edge e) { edges ^= e; }        
+        public bool HasAnyEdge(Edge e) { return (edges & e) > 0; }
         public bool HasEdgeTo(Tile other)
         {
             Tile dir = (this - other);
@@ -63,7 +67,7 @@ namespace Jobben
             {
                 Edge current = (Edge)(1 << i);  // edge 1 << 4 is northeast
 
-                if (HasEdge(current) && dir.Equals(Directions_All[i] * -1)) // opposite 4 is sw
+                if (HasAnyEdge(current) && dir.Equals(Directions_All[i] * -1)) // opposite 4 is sw
                 {
                     return true;
                 }
@@ -72,21 +76,12 @@ namespace Jobben
             return false;
         }
 
-        public Tile Normalized()
-        {
-            return new Tile(math.clamp(data, -one.data, one.data), Edges, type, occupied, index);
-        }
+        public Tile Normalized() { return new Tile(math.clamp(data, -one.data, one.data), Edges, types, occupied, index); }
+        public float Magnitude_Float() { return math.abs(data.x * math.SQRT2 + data.y * math.SQRT2 + data.z * math.SQRT2); }
+        public int Magnitude_Int() { return (int)Magnitude_Float(); }
 
-        public float Magnitude_Float()
-        { 
-            return data.x * math.SQRT2 + data.y * math.SQRT2 + data.z * math.SQRT2; 
-        }
-
-        public static int3 Abs(Tile n)
-        {
-            return new int3(math.abs(n.data.x), math.abs(n.data.y), math.abs(n.data.z));
-        }
-
+        public static int3 Abs(Tile n) { return new int3(math.abs(n.data.x), math.abs(n.data.y), math.abs(n.data.z)); }
+        public static Tile Lerp(Tile start, Tile end, float t) { return start + (end - start) * t; }
         public static Tile EdgeToDirection(Edge e)
         {
             var directions = Directions_All;
@@ -97,9 +92,8 @@ namespace Jobben
                 if ((e & current) == 0) { return directions[i]; }
             }
 
-            return MaxValue;
+            return zero;
         }
-
         public static Edge DirectionToEdge(Tile node)
         {
             Tile n = node.Normalized();
@@ -114,8 +108,7 @@ namespace Jobben
 
             return Edge.None;
         }
-
-        public static Edge Opposite(Edge e)
+        public static Edge OppositeEdge(Edge e)
         {
             if (e.Equals(Edge.North)) { return Edge.South; }
             if (e.Equals(Edge.NorthEast)) { return Edge.SouthWest; }
@@ -151,36 +144,44 @@ namespace Jobben
         #endregion
 
         #region Overrides and Interfaces
-        /// <summary>
-        /// NOTE: Copies node data from Node a.
-        /// </summary>
+        /// <summary> NOTE: Copies node data from Node a. </summary>
         public static Tile operator +(Tile a, Tile b)
         {
             a.data = new int3(a.data.x + b.data.x, a.data.y + b.data.y, a.data.z + b.data.z);
             return a;
         }
 
-        /// <summary>
-        /// NOTE: Copies node data from Node a.
-        /// </summary>
+        /// <summary> NOTE: Copies node data from Node a. </summary>
         public static Tile operator -(Tile a, Tile b)
         {
             a.data = new int3(a.data.x - b.data.x, a.data.y - b.data.y, a.data.z - b.data.z);
             return a;
         }
 
-        /// <summary>
-        /// NOTE: Copies a node data to new node.
-        /// </summary>
+        /// <summary> NOTE: Copies node a data to new node. </summary>
         public static Tile operator *(Tile a, int k)
         {
             a.data = new int3(a.data.x * k, a.data.y * k, a.data.z * k);
             return a;
         }
 
+        /// <summary> NOTE: Copies node a data to new node. </summary>
+        public static Tile operator *(Tile a, float f)
+        {        
+            float3 f3 = new float3(a.data.x * f, a.data.y * f, a.data.z * f);
+            a.data = new int3(f3);
+            return a;
+        }
+
+        /// <summary> NOTE: Copies node a data to new node. </summary>
+        public static Tile operator +(Tile a, Edge e)
+        {
+            return a + EdgeToDirection(e);
+        }
+
         public override int GetHashCode() 
-        { 
-            return data.x + (data.y << 16);
+        {
+            return data.GetHashCode();
         }
 
         public override string ToString()
@@ -193,26 +194,5 @@ namespace Jobben
             return data.x == other.data.x && data.y == other.data.y && data.z == other.data.z;
         }
         #endregion
-    }
-
-    public struct TileCompare : IComparer<Tile>
-    {
-        public readonly MapData data;
-        public readonly Tile target;
-
-        /// <summary>
-        /// Creates a comparison struct that is used in PathJob to organize the frontier/open list by their manhattan
-        /// distance to the target node.
-        /// </summary>
-        public TileCompare(Tile target, MapData data) { this.target = target; this.data = data; }
-
-        public int Compare(Tile a, Tile b)
-        {
-            int distToA = Graph.ManhattanDistance(a, target, data);
-            int distToB = Graph.ManhattanDistance(b, target, data);
-            if (distToA < distToB) { return -1; }
-            else if (distToA > distToB) { return 1; }
-            return 0;
-        }
-    }
+    }    
 }

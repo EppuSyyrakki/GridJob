@@ -47,7 +47,7 @@ namespace Jobben
 
 			if (Physics.Raycast(ray, out var hit, 100f, gs.Graph.Data.terrainLayer))
 			{
-				Tile t = gs.Graph.WorldToNode(hit.point);   // Find the tile that was clicked
+				Tile t = gs.Graph.WorldToTile(hit.point);   // Find the tile that was clicked
 
                 if (!t.Equals(Tile.MaxValue) || !gs.Selected.Equals(t)) 
                 {
@@ -62,14 +62,14 @@ namespace Jobben
 
         private void PrintTile(Tile t)
         {
-            string s = $"Tile {t} selected. Edges: ";
+            string s = $"Tile {t}, type {t.Type}. Edges: ";
             Tile[] directions = Tile.Directions_All;
 
             for (int i = 0; i < directions.Length; i++)
             {
                 Edge e = Tile.DirectionToEdge(directions[i]);
 
-                if (!t.HasEdge(e)) { continue; }
+                if (!t.HasAnyEdge(e)) { continue; }
 
                 s += Enum.GetName(typeof(Edge), e) + ", ";
             }
@@ -84,11 +84,6 @@ namespace Jobben
             base.OnInspectorGUI();
             
             if (GUILayout.Button((editMode ? "Disable " : "Enable ") + "edit mode")) { editMode = !editMode; }
-
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Selected tile: ");
-            EditorGUILayout.LabelField(edited.ToString());
-            EditorGUILayout.EndHorizontal();
         }
 
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Jobben.Jobs;
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Jobs;
@@ -10,7 +11,7 @@ namespace Jobben
     public class GraphSystem : MonoBehaviour
     {
         [SerializeField]
-        bool log = true, showNodes = true;
+        bool logPathfinding = false, drawPathfinding = false, showAllTiles = false, showResult = false;
 
         [SerializeField]
         private int jobCount = 1;
@@ -21,22 +22,31 @@ namespace Jobben
         [SerializeField]
         private Color gridColor = new Color(1, 1, 1, 0.08f);
 
-        private NativeArray<JobHandle> n_handles;   // Allocator.TempJob
-        private NativeArray<Tile> n_starts; // Allocator.TempJob
-        private NativeArray<Tile> n_goals;  // Allocator.TempJob         
-        private NativeList<Tile> n_result;  // Allocator.TempJob
+        [SerializeField]
+        private bool enableDistanceField = true;
+
+        [SerializeField, Range(0, 32)]
+        private int fieldRange = 10;
+
+
+        private GameObject player;
+        private Tile start = Tile.zero;
+        private JobHandle pathHandle;
+        private JobHandle fieldHandle;
+        private NativeList<Tile> n_pathResult;  // Allocator.TempJob
+        private NativeList<Tile> n_fieldResult;   // Allocator.TempJob
         private NativeArray<Tile> n_tiles;  // Allocator.Persistent
 
         private bool scheduled = false;
-        private float scheduleTime;
 
         [SerializeField]
-        private MapData data;
-        private List<Tile> path;
+        private MapData unstoredData;
+        
+        private List<Tile> aStarPath;
+        private List<Tile> bfsField;
 
         public Graph Graph { get; private set; } 
         public MapAsset Asset => asset;
-        public List<Tile> Path => path;
 
         public Tile Selected { get; set; }
         public Action<Tile> SelectedChanged;
@@ -45,7 +55,9 @@ namespace Jobben
         private void Awake()
         {
             Selected = Tile.MaxValue;
-            path = new List<Tile>();
+            aStarPath = new List<Tile>();
+            bfsField = new List<Tile>();
+            player = GameObject.FindGameObjectWithTag("Player");
 
             if (!Graph.IsInitialized)
             {
@@ -54,14 +66,19 @@ namespace Jobben
         }
 
         private void OnEnable()
-        {
-            
+        {          
             n_tiles = new NativeArray<Tile>(Graph.Tiles.Length, Allocator.Persistent);
         }
 
         private void Start()
         {
             SetWorldPosition();
+            AutoSetup();
+
+            for (int i = 0; i < Graph.Tiles.Length; i++)
+            {
+                n_tiles[i] = Graph.Tiles[i];
+            }
         }
 
         private void OnDisable()
@@ -72,26 +89,22 @@ namespace Jobben
         private void Update()
         {
             SetWorldPosition();
+            Tile playerPos = Graph.WorldToTile(player.transform.position);
+
+            if (Graph.HasTile(playerPos, Graph.Data))
+            {
+                start = playerPos;
+            }
 
             if (Input.GetMouseButtonDown(0))
             {
-                InitTempJobNatives();
                 Tile target = MouseCastTile();
 
-                if (target.Equals(Tile.MaxValue)) { return; }
+                if (target.Equals(Tile.MaxValue)) { return; }               
 
-                for (int i = 0; i < Graph.Tiles.Length; i++)
-                {
-                    n_tiles[i] = Graph.Tiles[i];
-                }
-
-                for (int i = 0; i < jobCount; i++)
-                {
-                    ScheduleJob(new Tile(0, 1, 0), target, i);
-                }
-
+                //ScheduleFieldJob(start, fieldRange); 
+                SchedulePathJob(start, target);
                 scheduled = true;
-                scheduleTime = Time.time;
             }
         }
 
@@ -99,62 +112,86 @@ namespace Jobben
         {
             if (!scheduled) { return; }
 
-            JobHandle.CompleteAll(n_handles);
-            path.Clear();
+            bfsField.Clear();
+            aStarPath.Clear();
+            // bfsHandle.Complete();            
+            pathHandle.Complete();
 
-            for (int i = 0; i < n_result.Length; i++)
-            {
-                path.Add(n_result[i]);
-            }
+            // foreach (var tile in n_bfsResult) { bfsField.Add(tile); }
+            for (int i = 0; i < n_pathResult.Length; i++) { aStarPath.Add(n_pathResult[i]); }
 
-            if (log) { Debug.Log($"Completed {jobCount} PathJobs in {Time.time - scheduleTime} "); path.Clear(); }
-
-            DisposeTempJobNatives();
-            scheduled = false;
+            // n_bfsResult.Dispose();
+            n_pathResult.Dispose();
+            scheduled = false;        
         }
 
         private void OnDrawGizmosSelected()
         {
-            if (!showNodes) { return; }
-
-            foreach (Tile t in Graph.Tiles)
-            {               
-                var world = Graph.TileToWorld(t, Graph.Data);
-                var draw = new Vector3(world.x, world.y + Graph.Data.cellSize.y * 0.5f, world.z);
-                var color = t.Equals(Selected) ? Color.green : gridColor;
-                Gizmos.color = t.Edges == Edge.None ? Color.black : color;
-                Gizmos.DrawWireCube(draw, Graph.Data.cellSize * 0.98f);
+            if (showAllTiles) 
+            {
+                foreach (Tile t in Graph.Tiles)
+                {
+                    var world = Graph.TileToWorld(t, Graph.Data);
+                    var draw = new Vector3(world.x, world.y + Graph.Data.cellSize.y * 0.5f, world.z);
+                    var color = t.Equals(Selected) ? Color.green : gridColor;
+                    Gizmos.color = t.Edges == Edge.None ? Color.black : color;
+                    Gizmos.DrawWireCube(draw, Graph.Data.cellSize * 0.98f);
+                }
             }
 
-            if (path != null && path.Count > 0)
+            if (!showResult) { return; }
+
+            if (bfsField != null) { DrawResult(bfsField, Color.green); }
+            if (aStarPath != null) { DrawResult(aStarPath, Color.blue); }
+        }
+
+        private void DrawResult(List<Tile> tiles, Color color)
+        {
+            if (tiles == null) { return; }
+
+            for (int i = 0; i < tiles.Count; i++)
             {
-                for (int i = 0; i < path.Count; i++)
-                {
-                    Gizmos.color = Color.blue;
-                    Gizmos.DrawSphere(Graph.TileToWorld(path[i], Graph.Data), Graph.Data.cellSize.x * 0.25f);
-                }
+                Gizmos.color = color;
+                Gizmos.DrawSphere(Graph.TileToWorld(tiles[i], Graph.Data), Graph.Data.cellSize.x * 0.15f);
             }
         }
         #endregion
 
-        private bool ScheduleJob(Tile start, Tile goal, int i)
+        private bool SchedulePathJob(Tile start, Tile goal)
         {
-            if (!Graph.HasTile(start, Graph.Data.size) || !Graph.HasTile(goal, Graph.Data.size))
+            var mDist = Heuristic.Manhattan(goal, start, Graph.Data);
+            var maxDistance = Graph.Data.maxPathLength * Graph.Data.directCost;
+
+            if (logPathfinding)
             {
-                return false;
+                Debug.Log($"Attempting to Schedule Path Job: From {start} To {goal}, " 
+                    + $" Manhattan {mDist}, maxDist: {maxDistance}");
             }
 
-            n_starts[i] = start;
-            n_goals[i] = goal;
-            var job = new PathJob(n_starts[i], n_goals[i], n_tiles, n_result, data, log);
-            JobHandle dependsOn = i == 0 ? default : n_handles[i - 1];
-            n_handles[i] = job.Schedule(dependsOn);
+            if (!Graph.HasTile(start, Graph.Data) || !Graph.HasTile(goal, Graph.Data) || mDist > maxDistance) { return false; }
 
-            if (log)
+            n_pathResult = new NativeList<Tile>(Graph.Data.maxPathLength, Allocator.TempJob);
+            this.start = start;           
+            var job = new AStarPathJob(start, goal, n_tiles, n_pathResult, Graph.Data, logPathfinding, drawPathfinding);
+            pathHandle = job.Schedule();
+            return true;
+        }
+
+        private bool ScheduleFieldJob(Tile center, int fieldRange)
+        {           
+            if (logPathfinding)
             {
-                var mDist = Graph.ManhattanDistance(n_goals[i], n_starts[i], Graph.Data);
-                Debug.Log($"Job Scheduled: From {n_starts[i]} To {n_goals[i]},  Manhattan {mDist}, ");
+                Debug.Log($"Attempting to schedule distance field job: From {center}, Dist: {fieldRange}" 
+                    + $", MaxCost: {fieldRange * Graph.Data.directCost}");
             }
+
+            if (!Graph.HasTile(center, Graph.Data) 
+                || fieldRange > math.max(Graph.Data.size.x, Graph.Data.size.z)) { return false; }
+
+            n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
+            start = center;        
+            var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, Graph.Data, logPathfinding);
+            fieldHandle = job.Schedule();
 
             return true;
         }
@@ -163,37 +200,15 @@ namespace Jobben
         {
             Ray ray = MouseRay(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
             Physics.Raycast(ray, out var hit);
-            return Graph.WorldToNode(hit.point);
-        }
-
-        private void InitTempJobNatives()
-        {
-            n_starts = new NativeArray<Tile>(jobCount, Allocator.TempJob);
-            n_goals = new NativeArray<Tile>(jobCount, Allocator.TempJob);
-            n_handles = new NativeArray<JobHandle>(jobCount, Allocator.TempJob);
-            n_result = new NativeList<Tile>(Graph.Data.maxPathLength, Allocator.TempJob);
-        }
-
-        private void DisposeTempJobNatives()
-        {
-            n_starts.Dispose();
-            n_goals.Dispose();
-            n_handles.Dispose();
-            n_result.Dispose();
-        }
-
-        private static Tile Random(int3 size)
-        {
-            var data = new int3(UnityEngine.Random.Range(0, size.x), UnityEngine.Random.Range(0, size.y), UnityEngine.Random.Range(0, size.z));
-            return new Tile(data);
+            return Graph.WorldToTile(hit.point);
         }
 
         public void LoadGraph()
         {
             if (asset.Data.EnsureSize())
             {
-                data = asset.Data;
-                Graph = new Graph(asset, log);
+                unstoredData = asset.Data;
+                Graph = new Graph(asset, logPathfinding);
                 return;
             }
 
@@ -217,13 +232,13 @@ namespace Jobben
             LoadGraph();
         }
 
-        [ContextMenu("Generate new from this data", false, 0)]
+        [ContextMenu("Generate new from unstored data", false, 0)]
         private void GenerateGraph()
         {
-            Graph = new Graph(data, true);
+            Graph = new Graph(unstoredData, true);
         }
 
-        [ContextMenu("Auto setup node connections", false, 1)]
+        [ContextMenu("Auto setup tile connections", false, 1)]
         private void AutoSetup()
         {
             Graph.AutoBuild();           

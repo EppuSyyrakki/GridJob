@@ -9,7 +9,7 @@ namespace Jobben
 	{
 		public static void AddOrModify<T1, T2>(this Dictionary<T1, T2> dict, T1 key, T2 value)
 		{
-			if (dict.TryGetValue(key, out _)) { dict[key] = value; return; }
+			if (dict.ContainsKey(key)) { dict[key] = value; return; }
 			dict.Add(key, value);
 		}
 
@@ -26,6 +26,11 @@ namespace Jobben
 		public static int3 MaxValue(this int3 _)
         {
 			return new int3(int.MaxValue, int.MaxValue, int.MaxValue);
+        }
+
+		public static bool IsAnyOf(this Edge e, Edge edges)
+        {
+			return (e & edges) > 0;
         }
 	}
 }

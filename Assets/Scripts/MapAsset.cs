@@ -65,11 +65,11 @@ namespace Jobben
 			return Data;
 		}
 
-		public bool UpdateTile(Tile t)
+		public bool UpdateTile(Tile tile)
         {
-			if (!Graph.HasTile(t, data.size)) { return false; }
+			if (!Graph.CalculateIndex(tile, data, out int index)) { return false; }
 
-			tiles[t.index] = t;
+			tiles[index] = tile;
 			return true;
         }
 	}

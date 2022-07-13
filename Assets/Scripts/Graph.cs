@@ -5,7 +5,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 
-namespace Jobben 
+namespace Jobben
 {
 	public struct Graph
 	{
@@ -29,7 +29,7 @@ namespace Jobben
 			Assert.IsTrue((data.size.x * data.size.y * data.size.z) <= TILES_MAX);
 			Data = data;
 			tiles = new Tile[data.size.x * data.size.y * data.size.z];
-			
+
 			int i = 0;
 
 			for (int z = 0; z < data.size.z; z++)
@@ -38,7 +38,7 @@ namespace Jobben
 				{
 					for (int x = 0; x < data.size.x; x++)
 					{
-						tiles[i] = EmptyEdges(new Tile(x, y, z, Edge.All, TileType.Empty, false, i), data);
+						tiles[i] = new Tile(x, y, z, Edge.None, TileType.Empty, false, i);
 						i++;
 					}
 				}
@@ -53,7 +53,7 @@ namespace Jobben
 		}
 
 		public Graph(MapAsset asset, bool log = false)
-        {
+		{
 			Assert.IsTrue((asset.Data.size.x * asset.Data.size.y * asset.Data.size.z) <= TILES_MAX);
 			tiles = new Tile[asset.Tiles.Length];
 			Data = asset.LoadFromAsset(out tiles);
@@ -61,263 +61,173 @@ namespace Jobben
 
 			if (log)
 			{
-				int3 s = asset.Data.size;
+                Unity.Mathematics.int3 s = asset.Data.size;
 				Debug.Log(this + $" loaded {Tiles.Length} tiles from {s.x} * {s.y} * {s.z} in asset {asset.name}");
-			}	
+			}
 		}
 		#endregion
 
 		#region Graph building
+		public void AutoBuild(bool log = false)
+		{
+			LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.coverLayer;
 
-		/*	Auto build notes:
-		 *	1. Loop all nodes 
-		 *		1.1. Raycast each for layers terrain, obstacle, climb, structure, whatever. 
-		 *		1.2. if blocked, Set Edges.None and TileType.Terrain to blocked tiles. Add current to blocked list.
-		 *		1.3. Disable Edge.Down from above (if exists)
-		 *		1.4. if climbable and above exists, Add Edge.Up
-		 *		1.5. scan lateral neighbors for first hit, add that as edge to up neighbor
-		 *	2. Iterate blocked list
-		 *	3. If node.data.y < data.size.y - 1 (below highest level), do: 
-		 *		3.1. Get current + Node.up if it's not in the blocked nodes list
-		 *		3.2. Scan it for lateral neighbors that are not in the blocked nodes
-		 *		3.3. Enable edge toward existing neighbor
-		 *		3.4. If the neighbor doesnt have Edge.Down, enable the opposite edge for the neighbor.
-		 *		3.5. goto 3
-		 *	4. Assign from blocked list to nodes[]
-		*/
-
-		// TODO: Make a real-time Job out of this
-
-		//public void AutoBuildAlt()
-  //      {
-		//	var blockedList = new List<Tile>(tiles.Length / 2);
-
-		//	for (int i = 0; i < tiles.Length; i++)  // 1.
-		//	{
-		//		Tile tile = tiles[i];
-		//		LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.obstacleLayer;
-
-		//		if (BoxcastTile(tile, Data, ref layers, includeTriggers: true)) // 1.1
-		//		{
-		//			if (layers == Data.terrainLayer)
-		//			{
-		//				tile = HandleTerrain(blockedList, tile); // 1.2 and 1.3
-		//			}
-		//			else if (layers == Data.climbLayer)
-		//			{
-		//				tile = HandleClimb(tile); // 1.4 and 1.5
-		//			}
-		//		}
-
-		//		tiles[i] = tile;
-		//	}
-		//}
-
-		public void AutoBuild()
-        {
-			var blockedList = new List<Tile>(tiles.Length / 2);
-
-			for (int i = 0; i < tiles.Length; i++)	// 1.
+			for (int i = 0; i < tiles.Length; i++)
 			{
-				Tile tile = tiles[i];
-				LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.obstacleLayer;
-
-				if (BoxcastTile(tile, Data, ref layers, includeTriggers: true))	// 1.1
-				{ 
-					if (layers == Data.terrainLayer)
-                    {
-                        tile = HandleTerrain(blockedList, tile); // 1.2 and 1.3
-                    }
-                    else if (layers == Data.climbLayer)
-                    {
-                        tile = HandleClimb(tile); // 1.4 and 1.5
-                    }
-                }
-
+				Tile tile = tiles[i];				
+				TileType type = BoxcastTileType(tile, Data, layers, includeTriggers: true);
+				tile.RemoveEdges(Edge.All);
+				tile.SetType(type);
 				tiles[i] = tile;
 			}
 
-            for (int i = 0; i < tiles.Length; i++)
+			// Tiles have no edges as default. Add them according to type and neighbors.
+			GetTilesOfTypes(TileType.Empty, TileType.Climb, out var empties, out var climbs);
+
+			foreach (Tile tile in empties)
             {
-                Tile t = DisconnectMissingEdges(tiles[i], Data, in tiles);
-                tiles[i] = t;
+				Tile altered = HandleEmptys(tile);
+				tiles[altered.index] = altered;
             }
 
-            Tile[] laterals = Tile.Directions_Lateral;
-
-			foreach (Tile t in blockedList)	// 2.
+			foreach (Tile tile in climbs)
             {
-				if (t.data.y < Data.size.y - 1)	// 3.
-                {
-					if (blockedList.Contains(t + Tile.up)) { continue; }
-
-					Tile above = tiles[CalculateIndex(t + Tile.up, Data)];  // 3.1					
-                    
-					for (int i = 0; i < laterals.Length; i++)
-                    {
-						if (HasTile(above + laterals[i], Data) && !blockedList.Contains(above + laterals[i]))	// 3.2
-						{
-							Tile aboveNeighbor = tiles[CalculateIndex(above + laterals[i], Data)];
-							above.AddEdges(Tile.DirectionToEdge(laterals[i]));	// 3.3
-
-							if (aboveNeighbor.HasEdge(Edge.Down)) { continue; }
-
-							aboveNeighbor.AddEdges(Tile.DirectionToEdge(laterals[i] * -1));   // 3.4
-							tiles[aboveNeighbor.index] = aboveNeighbor;
-                        }
-                    }
-
-					tiles[above.index] = above;
-                }
+				Tile altered = HandleClimb(tile);
+				tiles[altered.index] = altered;
             }
-		}
-
-        private Tile HandleClimb(Tile tile)
-        {
-            tile.SetType(TileType.Climb);
-
-            if (HasTile(tile + Tile.up, Data))
-            {
-                Tile above = tiles[CalculateIndex(tile + Tile.up, Data)];
-                var directions = Tile.Directions_Direct;
-
-                for (int i = 0; i < directions.Length; i++)
-                {
-                    LayerMask layer = Data.terrainLayer | Data.structureLayer;
-
-                    if (BoxcastTile(tile + directions[i], Data, ref layer))
-                    {
-                        Edge edge = Tile.DirectionToEdge(directions[i]);
-                        above.AddEdges(edge);
-                        tiles[above.index] = above;
-                    }
-                }
-            }
-
-			return tile;
         }
 
-        private Tile HandleTerrain(List<Tile> blockedList, Tile tile)
+        /// <summary> Disables edges at size limits. </summary>
+        private Tile RemoveLimitEdges(Tile tile)
         {
-            tile.SetEdges(Edge.None);
-            tile.SetType(TileType.Terrain);
-            blockedList.Add(tile); 
+            int3 i = tile.data;
 
-            if (HasTile(tile + Tile.up, Data)) 
-            {
-                Tile above = tiles[CalculateIndex(tile + Tile.up, Data)];
-                above.RemoveEdges(Edge.Down);
-                tiles[above.index] = above;
-            }
+            if (i.x == 0) { tile.RemoveEdges(Edge.SouthWest | Edge.West | Edge.NorthWest); }
+            else if (i.x == Data.size.x - 1) { tile.RemoveEdges(Edge.NorthEast | Edge.East | Edge.SouthEast); }
+            if (i.z == 0) { tile.RemoveEdges(Edge.SouthEast | Edge.South | Edge.SouthWest); }
+            else if (i.z == Data.size.z - 1) { tile.RemoveEdges(Edge.NorthWest | Edge.North | Edge.NorthEast); }
 
             return tile;
         }
 
-        /// <summary>
-        /// Disables edges at size limits, all up edges, and all lateral edges when y > 0.
-        /// </summary>
-        private static Tile EmptyEdges(Tile t, MapData data)
-        {
-			int3 i = t.data;
-			t.RemoveEdges(Edge.Up);
-			
-			if (i.x == 0) { t.RemoveEdges(Edge.SouthWest | Edge.West | Edge.NorthWest); }			
-			else if (i.x == data.size.x - 1) { t.RemoveEdges(Edge.NorthEast | Edge.East | Edge.SouthEast); }
-			
-			if (i.y == 0) { t.RemoveEdges(Edge.Down); }
-			else if (i.y > 0) { t.RemoveEdges(Edge.AllSameLevel); }
-
-			if (i.z == 0) { t.RemoveEdges(Edge.SouthEast | Edge.South | Edge.SouthWest); }
-			if (i.z == data.size.z - 1) { t.RemoveEdges(Edge.NorthWest | Edge.North | Edge.NorthEast); }
-
-			return t;
-        }
-		 
-		/// <summary>
-		/// Check each of node's possible neighbors to check if they have a common edge (the opposite edge for the neighbor). 
-		/// Down direction is passed over if is not blocked. If not, the edge is removed from the node before returning.
-		/// TODO: The nodes array is read only, but SHOULD NOT BE USED IN JOBS ATM
-		/// </summary>
-		public static Tile DisconnectMissingEdges(Tile t, MapData data, in Tile[] tiles)
-        {
-			Tile[] directions = Tile.Directions_All;
-			Edge edgesToRemove = 0;
-
-			for (int i = 0; i < directions.Length; i++)
+        private Tile HandleEmptys(Tile tile)
+		{
+			if (tile.data.y == 0)	// Bottom floor, no need to check for neighbor below this
             {
-				Tile candidate = t + directions[i];
-				int index = CalculateIndex(candidate, data);
+				tile = AddLateralEdgesTowardNeighbors(tile);
+				return tile;
+			}
 
-				if (!t.HasEdgeTo(candidate) || index < 0 || index > data.Length
-					|| (directions[i].Equals(Tile.down) && tiles[index].Type != TileType.Terrain))  
-				{ 
-					continue; 
+			if (CalculateIndex(tile + Tile.down, Data, out int belowIndex)) // A tile exists below this one
+			{
+				Tile below = tiles[belowIndex]; 
+
+				if (below.IsAnyType(TileType.WalkableTypes))	// Tile below is free
+				{
+					tile.AddEdges(Edge.Down);
+					tile.AddType(TileType.Jump);
+					return tile;
 				}
 
-				Tile neighbor = tiles[index];			
+				tile = AddLateralEdgesTowardNeighbors(tile);	// Tile below is blocked         
+			}
 
-				if (!neighbor.HasEdgeTo(t)) { edgesToRemove |= Tile.DirectionToEdge(directions[i]); }
-            }
+			return tile;
+		}
 
-			t.RemoveEdges(edgesToRemove);
-			return t;          
-        }
+		private Tile AddLateralEdgesTowardNeighbors(Tile tile)
+        {
+			// TODO: When checking out diagonal neighbors, make sure both direct neighbors next to it are free.
+			// This should prevent pathfinding cutting corners.
+			Edge toAdd = 0;
+
+			for (int i = 0; i < Tile.Directions_Lateral.Length; i++)	// loop through horizontal neighbors
+			{
+				Tile dir = Tile.Directions_Lateral[i];
+
+				if (CalculateIndex(tile + dir, Data, out int neighborIndex))	// Neighbor exists
+				{
+					Tile neighbor = tiles[neighborIndex];
+
+					if (neighbor.IsAnyType(TileType.BlockedTypes)) { continue; }	// Neighbor is unwalkable
+
+					toAdd |= Tile.DirectionToEdge(dir);	// Neighbor is walkable, add edge towards it
+				}
+			}
+
+			tile.AddEdges(toAdd);
+			return tile;
+		}
+
+		/// <summary> Enables Edge.up, finds a blocked direction and enables the above tile edge to that direction. </summary>
+		private Tile HandleClimb(Tile tile)
+		{
+			tile = AddLateralEdgesTowardNeighbors(tile);
+
+			if (!CalculateIndex(tile + Tile.up, Data, out int aboveIndex)) { return tile; }
+
+			tile.AddEdges(Edge.Up); // Above tile exists.
+			Tile above = tiles[aboveIndex];
+			var directions = Tile.Directions_Direct;    // Only scan the main directions for exiting climb tiles (N E S W)
+
+			for (int i = 0; i < directions.Length; i++)
+			{
+				// Loop neighbors, find a blocked one and add the direction to that as edge to above tile
+				if (!CalculateIndex(tile + directions[i], Data, out int neighborIndex)) { continue; }
+
+				Tile neighbor = tiles[neighborIndex];  // Neighbor exists.
+
+				if (neighbor.IsAnyType(TileType.BlockedTypes)) // It's blocked
+				{
+					Edge edge = Tile.DirectionToEdge(directions[i]);
+					above.AddEdges(edge);
+					tiles[above.index] = above;
+				}
+			}
+
+			return tile;
+		}
 
 		/// <summary>
 		/// Uses Physics.CheckBox to detect anything on given layers in the node's world position. 
-		/// NOTE: SHOULD NOT BE USED INSIDE JOBS.
+		/// NOTE: CAN'T BE USED INSIDE JOBS B/C REGULAR PHYSICS CASTS FAIL THERE!
 		/// </summary>
-		private static bool BoxcastTile(Tile t, MapData data, ref LayerMask layers, bool includeTriggers = false)
+		private TileType BoxcastTileType(Tile tile, MapData data, LayerMask layers, bool includeTriggers = false)
 		{
-			var pos = TileToWorld(t, data) + Vector3.up * data.cellSize.y * 0.5f;
+			var pos = TileToWorld(tile, data) + Vector3.up * data.cellSize.y * 0.5f;
 			var radius = data.cellSize * data.obstacleCastRadius;
 			var interaction = includeTriggers ? QueryTriggerInteraction.Collide : QueryTriggerInteraction.Ignore;
+			var colliders = Physics.OverlapBox(pos, radius, Quaternion.identity, layers, interaction);
 
-			if (Physics.BoxCast(pos, radius, Vector3.up, out RaycastHit hit, Quaternion.identity, 0.05f, layers, interaction))
-            {
-				layers = hit.collider.gameObject.layer;
-				return true;
+			if (colliders.Length > 1)
+			{
+				Debug.LogWarning($"BoxcastTileType found {colliders.Length} colliders in {tile}");
+				Debug.DrawLine(TileToWorld(tile, Data), TileToWorld(tile + Tile.up * Data.size.y, Data), Color.red, 10f);
 			}
 
-			return false;
-		}
+			if (colliders.Length > 0)
+			{
+				return MapData.LayerMapping(colliders[0].gameObject.layer, data); 
+			}
 
+			return TileType.Empty;
+		}
 		#endregion
 
-		//public static List<Node> GetNeighbors(Node node, Node[] grid, MapData data)
-		//{
-		//    var directions = Node.Directions_All;
-		//    var neighbors = new List<Node>(directions.Length);
-
-		//    for (int i = 0; i < directions.Length; i++)
-		//    {
-		//        Edge current = (Edge)(1 << i);
-		//        Node neighbor = node + directions[i];
-
-		//        if (HasNode(neighbor, data.size) && node.HasEdge(current) && !node.occupied)
-		//        {
-		//            int neighborIndex = CalculateIndex(neighbor, data.size);
-		//            neighbors.Add(grid[neighborIndex]);
-		//        }
-		//    }
-
-		//    return neighbors;
-		//}
-
-		public static Vector3 TileToWorld(Tile t, MapData data)
-        {
-			var world = data.transformPosition + LocalPosition(t, data) + new Vector3(data.cellSize.x * 0.5f, 0f, data.cellSize.z * 0.5f);
+		public static Vector3 TileToWorld(Tile tile, MapData data)
+		{
+			var world = data.transformPosition + LocalPosition(tile, data) 
+				+ new Vector3(data.cellSize.x * 0.5f, 0f, data.cellSize.z * 0.5f);
 			var worldOffset = new Vector3(world.x, world.y, world.z);
 			return worldOffset;
-        }
+		}
 
-		public Tile WorldToNode(Vector3 worldPos)
-        {
+		public Tile WorldToTile(Vector3 worldPos)
+		{
 			Vector3 local = worldPos - Data.transformPosition;
 			Vector3 scaled = new Vector3(local.x / Data.cellSize.x, local.y / Data.cellSize.y, local.z / Data.cellSize.z);
-			int3 coord = new int3((int)scaled.x, (int)math.round(scaled.y), (int)scaled.z);
-			Tile tile = new Tile(coord);
-			return HasTile(tile, Data.size) ? tiles[CalculateIndex(tile, Data)] : Tile.MaxValue;
+			Tile tile = new Tile(new int3((int)scaled.x, (int)math.round(scaled.y), (int)scaled.z));
+			return CalculateIndex(tile, Data, out int index) ? tiles[index] : Tile.MaxValue;
 		}
 
 		public void Set(Tile[] tiles, MapData data)
@@ -329,79 +239,108 @@ namespace Jobben
 			for (int i = 0; i < tiles.Length; i++) { this.tiles[i] = tiles[i]; }
 		}
 
+        #region Tile Get
+        /// <summary> Finds and returns a list of all tiles of types flagged in param types. </summary>
+        public List<Tile> GetTilesOfType(TileType types)
+		{
+			List<Tile> list = new List<Tile>(tiles.Length);
+
+			for (int i = 0; i < tiles.Length; i++)
+			{
+				if (tiles[i].IsAnyType(types)) { list.Add(tiles[i]); }
+			}
+			return list;
+		}
+		/// <summary> Finds and returns a list of all tiles of given types. </summary>
+		public void GetTilesOfTypes(TileType t1, TileType t2, out List<Tile> l1, out List<Tile> l2)
+		{
+			l1 = new List<Tile>();
+			l2 = new List<Tile>();
+
+			for (int i = 0; i < tiles.Length; i++)
+			{
+				Tile tile = tiles[i];
+
+				if (tile.IsAnyType(t1)) { l1.Add(tile); }
+				else if (tile.IsAnyType(t2)) { l2.Add(tile); }
+			}
+		}
+		/// <summary> Loops tiles and adds them to lists according to their type. </summary>
+		public void GetTilesOfTypes(TileType t1, TileType t2, TileType t3, out List<Tile> l1, out List<Tile> l2, out List<Tile> l3)
+        {
+			l1 = new List<Tile>();
+			l2 = new List<Tile>();
+			l3 = new List<Tile>();
+
+			for (int i = 0; i < tiles.Length; i++)
+			{
+				Tile tile = tiles[i];
+				
+				if (tile.IsAnyType(t1)) { l1.Add(tile); }
+				else if (tile.IsAnyType(t2)) { l2.Add(tile); }
+				else if (tile.IsAnyType(t3)) { l3.Add(tile); }
+			}
+		}
+		#endregion
+
 		#region Statics
-		/// <summary>
-		/// Node's location relative to the object owning this graph.
-		/// </summary>
-		/// <param name="t"></param>
-		/// <param name="data"></param>
-		/// <returns></returns>
+		/// <summary> Node's location relative to the object owning this graph. </summary>
 		public static Vector3 LocalPosition(Tile t, MapData data)
 		{
 			return new Vector3(t.data.x * data.cellSize.x, t.data.y * data.cellSize.y, t.data.z * data.cellSize.z);
 		}
-
-		/// <summary>
-		/// Simple conversion from a direction to a cost.
-		/// </summary>
+		/// <summary> Simple conversion from a direction to a cost. </summary>
 		public static int Cost(Tile dir, MapData data)
-        {
+		{
 			var d = dir.Normalized().data;
 			if (d.y > 0) { return data.upCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 1) { return data.directCost; }
-            if (math.abs(d.x) + math.abs(d.z) == 2) { return data.diagonalCost; }
+			if (math.abs(d.x) + math.abs(d.z) == 2) { return data.diagonalCost; }
 
-            return data.diagonalCost;
-        }
-
-        public static int ManhattanDistance(Tile a, Tile b, MapData data)
-		{
-            int3 dist = a.data - b.data;
-            int height = dist.y > 0 ? data.upCost : data.directCost;
-            return math.abs(data.diagonalCost * math.min(dist.x, dist.z)) 
-				+ math.abs(data.directCost * math.max(dist.x, dist.z))
-				+ math.abs(dist.y * height);
-        }
-
-		public static int CalculateIndex(Tile t, MapData data)
+			return data.directCost;
+		}	
+		/// <summary> Convenience method to immediately know if index != -1. </summary>
+		public static bool CalculateIndex(Tile t, MapData data, out int index)
         {
+			index = CalculateIndex(t, data);
+			if (index == -1) { return false; }
+			return true;
+        }
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+		public static int CalculateIndex(Tile t, MapData data)
+		{
 			return CalculateIndex(t.data.x, t.data.y, t.data.z, data.size);
 		}
-
-        public static int CalculateIndex(Tile t, int3 size)
-        {
-            return CalculateIndex(t.data.x, t.data.y, t.data.z, size);
-        }
-
-        private static int CalculateIndex(int x, int y, int z, int3 size)
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+		public static int CalculateIndex(Tile t, int3 size)
 		{
-			// return (z << (size.x + size.y)) + (y << size.x) + x;
-			int value = (z * size.x * size.y) + (y * size.x) + x; // Unoptimized version, can be used with non-n^2 grids.
-			if (value < 0 || value > size.x * size.y * size.z) { return -1; }
+			return CalculateIndex(t.data.x, t.data.y, t.data.z, size);
+		}
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+		public static int CalculateIndex(int3 t, int3 size)
+		{
+			return CalculateIndex(t.x, t.y, t.z, size);
+		}
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+		public static int CalculateIndex(int x, int y, int z, int3 size)
+		{
+			if (x >= size.x || y >= size.y || z >= size.z || x < 0 || y < 0 || z < 0) { return -1; }
+			int value = (z * size.x * size.y) + (y * size.x) + x; 
 			return value;
 		}
 
-		public static bool HasTile(Tile t, MapData data)
+        public static bool HasTile(Tile t, MapData data)
         {
-			return HasTile(t.data, data.size);
+            return HasTile(t.data, data.size);
         }
-
-		public static bool HasTile(Tile t, int3 size)
+        public static bool HasTile(Tile t, int3 size)
         {
-			return HasTile(t.data, size);
+            return HasTile(t.data, size);
         }
-
-		public static bool HasTile(int3 i, int3 size)
+        public static bool HasTile(int3 i, int3 size)
         {
-			return i.x < size.x && i.y < size.y && i.z < size.z && i.x > -1 && i.y > -1 && i.z > -1;
-		}
-
-		private static bool IsPowerOfTwo(int3 i)
-		{
-			if (i.x == 0 || i.y == 0 || i.z == 0) { return false; }
-            var result = (int3)math.ceil(math.log(i) / math.log(2)) == (int3)math.floor(math.log(i) / math.log(2));
-			return result[0] && result[1] && result[2];
-		}
-		#endregion
-	}
+            return CalculateIndex(i, size) != -1;
+        }
+        #endregion
+    }
 }
