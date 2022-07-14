@@ -103,8 +103,10 @@ namespace Jobben
                 if (target.Equals(Tile.MaxValue)) { return; }               
 
                 //ScheduleFieldJob(start, fieldRange); 
-                SchedulePathJob(start, target);
-                scheduled = true;
+                if (SchedulePathJob(start, target))
+                {
+                    scheduled = true;
+                }                
             }
         }
 
@@ -160,7 +162,7 @@ namespace Jobben
         private bool SchedulePathJob(Tile start, Tile goal)
         {
             var mDist = Heuristic.Manhattan(goal, start, Graph.Data);
-            var maxDistance = Graph.Data.maxPathLength * Graph.Data.directCost;
+            var maxDistance = Graph.Data.size.x * Graph.Data.directCost;
 
             if (logPathfinding)
             {
@@ -186,7 +188,7 @@ namespace Jobben
             }
 
             if (!Graph.HasTile(center, Graph.Data) 
-                || fieldRange > math.max(Graph.Data.size.x, Graph.Data.size.z)) { return false; }
+                || fieldRange > Mathf.Max(Graph.Data.size.x, Graph.Data.size.z)) { return false; }
 
             n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
             start = center;        

@@ -111,7 +111,7 @@ namespace Jobben.Jobs
                 Tile neighbor = tile + directions[i];
 
                 // Manage with just checking the edge and relying on setting them up accurately.
-                if (tile.HasAnyEdge(current) && !tile.occupied)
+                if (tile.HasAnyEdge(current) && tile.IsAnyType(TileType.WalkableTypes))
                 {
                     var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
                     neighbors.Add(validNeighbor);

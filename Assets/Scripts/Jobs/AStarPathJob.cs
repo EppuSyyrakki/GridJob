@@ -128,7 +128,7 @@ namespace Jobben
         /// <summary>
         /// Returns only valid (movable) neighbor copies from the grid. Checks for node edges and grid limits.
         /// </summary>
-        private NativeList<Tile> GetNeighbors(Tile tile, int dropDepth = 2)
+        private NativeList<Tile> GetNeighbors(Tile tile)
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
@@ -144,7 +144,7 @@ namespace Jobben
 
                 // if (HasTile(neighbor) && t.HasEdge(current) && !t.occupied) For posterity.
                 // Manage with just checking the edge and relying on setting them up accurately.
-                if (tile.HasAnyEdge(current) && !tile.occupied)
+                if (tile.HasAnyEdge(current) && tile.IsAnyType(TileType.WalkableTypes))
                 {
                     var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
                     neighbors.Add(validNeighbor);
@@ -153,12 +153,6 @@ namespace Jobben
 
             directions.Dispose();
             return neighbors;
-        }
-
-        private bool HasTile(Tile t)
-        {
-            return t.data.x < data.size.x && t.data.y < data.size.y && t.data.z < data.size.z
-                && t.data.x > -1 && t.data.y > -1 && t.data.z > -1;
         }
     }
 }

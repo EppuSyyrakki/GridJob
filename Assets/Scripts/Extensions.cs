@@ -32,5 +32,20 @@ namespace Jobben
         {
 			return (e & edges) > 0;
         }
-	}
+
+        public static Edge OppositeEdge(this Edge e)
+        {
+            if (e.Equals(Edge.North)) { return Edge.South; }
+            if (e.Equals(Edge.NorthEast)) { return Edge.SouthWest; }
+            if (e.Equals(Edge.East)) { return Edge.West; }
+            if (e.Equals(Edge.SouthEast)) { return Edge.NorthWest; }
+            if (e.Equals(Edge.South)) { return Edge.North; }
+            if (e.Equals(Edge.SouthWest)) { return Edge.NorthEast; }
+            if (e.Equals(Edge.West)) { return Edge.East; }
+            if (e.Equals(Edge.NorthWest)) { return Edge.SouthEast; }
+            if (e.Equals(Edge.Up)) { return Edge.Down; }
+            if (e.Equals(Edge.Down)) { return Edge.Up; }
+            return Edge.None;
+        }
+    }
 }

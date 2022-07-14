@@ -6,8 +6,10 @@ namespace Jobben
     [System.Serializable]
     public struct MapData
     {
+        public const int MAX_LENGTH = 65536;
+
         [SerializeField]
-        public Unity.Mathematics.int3 size;
+        public byte3 size;
         [SerializeField]
         public int directCost, diagonalCost, upCost;
         [SerializeField]
@@ -26,8 +28,7 @@ namespace Jobben
 
         public bool EnsureSize()
         {
-            int length = size.x * size.y * size.z;
-            return length > 0 && length <= Graph.TILES_MAX;
+            return size.x > 0 && size.y > 0 && size.z > 0 && Length <= MAX_LENGTH;
         }
 
         public void SetWorldPosition(Vector3 pos)
