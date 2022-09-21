@@ -7,13 +7,13 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben
+namespace GridJob
 {
     [BurstCompatible]
     struct AStarPathJob : IJob
     {
         [ReadOnly]
-        private readonly bool log, draw;
+        private readonly bool log, draw, includeStart;
         [ReadOnly]
         private readonly MapData data;
         [ReadOnly]
@@ -28,8 +28,19 @@ namespace Jobben
         [WriteOnly]
         private NativeList<Tile> result;
 
-        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data, 
-            bool log = false, bool draw = false)
+        /// <summary>
+        /// Creates a pathfinding job using A*. 
+        /// </summary>
+        /// <param name="start">Starting tile</param>
+        /// <param name="goal">Target tile</param>
+        /// <param name="tiles">Map tiles as a flat array</param>
+        /// <param name="result">List that the resulting path is written in</param>
+        /// <param name="data">Struct holding map information</param>
+        /// <param name="log">Log search to console</param>
+        /// <param name="draw">Draw debug lines for search visualization</param>
+        /// <param name="includeStartInResult">Insert the starting tile in the result list</param>
+        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+            bool log = false, bool draw = false, bool includeStartInResult = false)
         {
             int startIndex = Graph.CalculateIndex(start, data);
             int goalIndex = Graph.CalculateIndex(goal, data);
@@ -42,6 +53,7 @@ namespace Jobben
             frontierSize = data.size.x * data.size.y * data.size.z / 32;
             this.log = log;
             this.draw = draw;
+            includeStart = includeStartInResult;
         }
 
         [BurstCompatible]
@@ -112,14 +124,19 @@ namespace Jobben
 
             while (!current.Equals(start))
             {
-                if (log) { Debug.Log($"Adding {current} to result array."); }
                 result.Add(tiles[current.index]);
                 current = tiles[cameFrom[current.index]];
                 items++;
             }
 
-            if (log) { Debug.Log($"Adding {start} to result array."); }
-            result.Add(start);
+            if (includeStart)
+            {
+                result.Add(start);
+                items++;
+            }
+
+            if (log) { Debug.Log(items + " tiles added to result array."); }
+            
             frontier.Dispose();
             costSoFar.Dispose();
             cameFrom.Dispose();
@@ -128,7 +145,7 @@ namespace Jobben
         /// <summary>
         /// Returns only valid (movable) neighbor copies from the grid. Checks for node edges and grid limits.
         /// </summary>
-        private NativeList<Tile> GetNeighbors(Tile tile, int dropDepth = 2)
+        private NativeList<Tile> GetNeighbors(Tile tile)
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
@@ -144,7 +161,7 @@ namespace Jobben
 
                 // if (HasTile(neighbor) && t.HasEdge(current) && !t.occupied) For posterity.
                 // Manage with just checking the edge and relying on setting them up accurately.
-                if (tile.HasAnyEdge(current) && !tile.occupied)
+                if (tile.HasAnyEdge(current) && tile.IsAnyType(TileType.WalkableTypes))
                 {
                     var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
                     neighbors.Add(validNeighbor);
@@ -153,12 +170,6 @@ namespace Jobben
 
             directions.Dispose();
             return neighbors;
-        }
-
-        private bool HasTile(Tile t)
-        {
-            return t.data.x < data.size.x && t.data.y < data.size.y && t.data.z < data.size.z
-                && t.data.x > -1 && t.data.y > -1 && t.data.z > -1;
         }
     }
 }

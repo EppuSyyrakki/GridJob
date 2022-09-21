@@ -1,4 +1,4 @@
-﻿using Jobben.Jobs;
+﻿using GridJob.Jobs;
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -6,15 +6,12 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Jobben
+namespace GridJob
 {
     public class GraphSystem : MonoBehaviour
     {
         [SerializeField]
         bool logPathfinding = false, drawPathfinding = false, showAllTiles = false, showResult = false;
-
-        [SerializeField]
-        private int jobCount = 1;
 
         [SerializeField]
         private MapAsset asset;
@@ -28,7 +25,6 @@ namespace Jobben
         [SerializeField, Range(0, 32)]
         private int fieldRange = 10;
 
-
         private GameObject player;
         private Tile start = Tile.zero;
         private JobHandle pathHandle;
@@ -37,13 +33,13 @@ namespace Jobben
         private NativeList<Tile> n_fieldResult;   // Allocator.TempJob
         private NativeArray<Tile> n_tiles;  // Allocator.Persistent
 
-        private bool scheduled = false;
+        private JobType scheduled = JobType.None;
 
         [SerializeField]
         private MapData unstoredData;
         
-        private List<Tile> aStarPath;
-        private List<Tile> bfsField;
+        private List<Tile> path;
+        private List<Tile> field;
 
         public Graph Graph { get; private set; } 
         public MapAsset Asset => asset;
@@ -55,13 +51,13 @@ namespace Jobben
         private void Awake()
         {
             Selected = Tile.MaxValue;
-            aStarPath = new List<Tile>();
-            bfsField = new List<Tile>();
+            path = new List<Tile>();
+            field = new List<Tile>();
             player = GameObject.FindGameObjectWithTag("Player");
 
             if (!Graph.IsInitialized)
             {
-                LoadGraph();
+                Load();
             }
         }
 
@@ -73,7 +69,6 @@ namespace Jobben
         private void Start()
         {
             SetWorldPosition();
-            AutoSetup();
 
             for (int i = 0; i < Graph.Tiles.Length; i++)
             {
@@ -100,29 +95,46 @@ namespace Jobben
             {
                 Tile target = MouseCastTile();
 
-                if (target.Equals(Tile.MaxValue)) { return; }               
+                if (target.Equals(Tile.MaxValue)) { return; }
 
-                //ScheduleFieldJob(start, fieldRange); 
-                SchedulePathJob(start, target);
-                scheduled = true;
+                if (enableDistanceField && ScheduleFieldJob(target, fieldRange))
+                {
+                    scheduled = JobType.Field;
+                }
+                else if (SchedulePathJob(start, target))
+                {
+                    scheduled = JobType.Path;
+                }                
             }
         }
 
         private void LateUpdate()
         {
-            if (!scheduled) { return; }
+            if (scheduled == JobType.None) { return; }
 
-            bfsField.Clear();
-            aStarPath.Clear();
-            // bfsHandle.Complete();            
-            pathHandle.Complete();
+            field.Clear();
+            path.Clear();
 
-            // foreach (var tile in n_bfsResult) { bfsField.Add(tile); }
-            for (int i = 0; i < n_pathResult.Length; i++) { aStarPath.Add(n_pathResult[i]); }
+            if (scheduled == JobType.Field)
+            {
+                fieldHandle.Complete();
+                foreach (var tile in n_fieldResult) 
+                { 
+                    field.Add(tile); 
+                }
+                n_fieldResult.Dispose();
+            }
+            else if (scheduled == JobType.Path)
+            {
+                pathHandle.Complete();
+                for (int i = 0; i < n_pathResult.Length; i++) 
+                { 
+                    path.Add(n_pathResult[i]); 
+                }
+                n_pathResult.Dispose();
+            }
 
-            // n_bfsResult.Dispose();
-            n_pathResult.Dispose();
-            scheduled = false;        
+            scheduled = JobType.None;        
         }
 
         private void OnDrawGizmosSelected()
@@ -141,8 +153,8 @@ namespace Jobben
 
             if (!showResult) { return; }
 
-            if (bfsField != null) { DrawResult(bfsField, Color.green); }
-            if (aStarPath != null) { DrawResult(aStarPath, Color.blue); }
+            if (field != null) { DrawResult(field, Color.green); }
+            if (path != null) { DrawResult(path, Color.blue); }
         }
 
         private void DrawResult(List<Tile> tiles, Color color)
@@ -160,7 +172,7 @@ namespace Jobben
         private bool SchedulePathJob(Tile start, Tile goal)
         {
             var mDist = Heuristic.Manhattan(goal, start, Graph.Data);
-            var maxDistance = Graph.Data.maxPathLength * Graph.Data.directCost;
+            var maxDistance = Mathf.Max(Graph.Data.size.x, Graph.Data.size.y) * Graph.Data.diagonalCost;
 
             if (logPathfinding)
             {
@@ -186,7 +198,7 @@ namespace Jobben
             }
 
             if (!Graph.HasTile(center, Graph.Data) 
-                || fieldRange > math.max(Graph.Data.size.x, Graph.Data.size.z)) { return false; }
+                || fieldRange > Mathf.Max(Graph.Data.size.x, Graph.Data.size.z)) { return false; }
 
             n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
             start = center;        
@@ -205,14 +217,11 @@ namespace Jobben
 
         public void LoadGraph()
         {
-            if (asset.Data.EnsureSize())
-            {
-                unstoredData = asset.Data;
-                Graph = new Graph(asset, logPathfinding);
-                return;
-            }
-
-            Debug.LogError(this + " Graph asset loading failed.");
+            if (asset == null) { Debug.LogError(this + ": No Map Asset found!"); return; }
+            else if (!asset.HasData) { Debug.LogError(this + ": Trying to load from empty Map Asset!"); return; }
+            else if (!asset.Data.EnsureSize()) { Debug.LogError(this + ": Map Asset too large!."); }
+            
+            Graph = new Graph(asset, logPathfinding);      
         }
 
         private Ray MouseRay(float2 mousePos)
@@ -252,7 +261,7 @@ namespace Jobben
 
         [ContextMenu("Force Load graph from asset", false, 3)]
         private void Load()
-        {
+        {           
             LoadGraph();
         }
     }

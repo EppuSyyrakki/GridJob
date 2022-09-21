@@ -5,12 +5,10 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 
-namespace Jobben
+namespace GridJob
 {
 	public struct Graph
 	{
-		public static int TILES_MAX = 65536;
-
 		public MapData Data { get; private set; }
 		public Tile[] Tiles { get { return tiles; } }
 
@@ -26,7 +24,7 @@ namespace Jobben
 		/// </summary>
 		public Graph(MapData data, bool log = false)
 		{
-			Assert.IsTrue((data.size.x * data.size.y * data.size.z) <= TILES_MAX);
+			Assert.IsTrue(data.EnsureSize());
 			Data = data;
 			tiles = new Tile[data.size.x * data.size.y * data.size.z];
 
@@ -38,7 +36,7 @@ namespace Jobben
 				{
 					for (int x = 0; x < data.size.x; x++)
 					{
-						tiles[i] = new Tile(x, y, z, Edge.None, TileType.Empty, false, i);
+						tiles[i] = new Tile(x, y, z, Edge.None, TileType.Empty, i);
 						i++;
 					}
 				}
@@ -54,14 +52,14 @@ namespace Jobben
 
 		public Graph(MapAsset asset, bool log = false)
 		{
-			Assert.IsTrue((asset.Data.size.x * asset.Data.size.y * asset.Data.size.z) <= TILES_MAX);
+			Assert.IsTrue(asset.Data.EnsureSize());
 			tiles = new Tile[asset.Tiles.Length];
 			Data = asset.LoadFromAsset(out tiles);
 			initialized = true;
 
 			if (log)
 			{
-                Unity.Mathematics.int3 s = asset.Data.size;
+                byte3 s = asset.Data.size;
 				Debug.Log(this + $" loaded {Tiles.Length} tiles from {s.x} * {s.y} * {s.z} in asset {asset.name}");
 			}
 		}
@@ -100,12 +98,12 @@ namespace Jobben
         /// <summary> Disables edges at size limits. </summary>
         private Tile RemoveLimitEdges(Tile tile)
         {
-            int3 i = tile.data;
+            sbyte3 d = tile.data;
 
-            if (i.x == 0) { tile.RemoveEdges(Edge.SouthWest | Edge.West | Edge.NorthWest); }
-            else if (i.x == Data.size.x - 1) { tile.RemoveEdges(Edge.NorthEast | Edge.East | Edge.SouthEast); }
-            if (i.z == 0) { tile.RemoveEdges(Edge.SouthEast | Edge.South | Edge.SouthWest); }
-            else if (i.z == Data.size.z - 1) { tile.RemoveEdges(Edge.NorthWest | Edge.North | Edge.NorthEast); }
+            if (d.x == 0) { tile.RemoveEdges(Edge.SouthWest | Edge.West | Edge.NorthWest); }
+            else if (d.x == Data.size.x - 1) { tile.RemoveEdges(Edge.NorthEast | Edge.East | Edge.SouthEast); }
+            if (d.z == 0) { tile.RemoveEdges(Edge.SouthEast | Edge.South | Edge.SouthWest); }
+            else if (d.z == Data.size.z - 1) { tile.RemoveEdges(Edge.NorthWest | Edge.North | Edge.NorthEast); }
 
             return tile;
         }
@@ -214,6 +212,20 @@ namespace Jobben
 		}
 		#endregion
 
+		public bool UpdateTile(Tile t)
+		{
+			try
+			{
+				tiles[t.index] = t;
+				return true;
+			}
+			catch (IndexOutOfRangeException e)
+			{
+				Debug.LogError(e);
+				return false;
+			}
+		}
+
 		public static Vector3 TileToWorld(Tile tile, MapData data)
 		{
 			var world = data.transformPosition + LocalPosition(tile, data) 
@@ -226,7 +238,7 @@ namespace Jobben
 		{
 			Vector3 local = worldPos - Data.transformPosition;
 			Vector3 scaled = new Vector3(local.x / Data.cellSize.x, local.y / Data.cellSize.y, local.z / Data.cellSize.z);
-			Tile tile = new Tile(new int3((int)scaled.x, (int)math.round(scaled.y), (int)scaled.z));
+			Tile tile = new Tile(new sbyte3((sbyte)scaled.x, (sbyte)math.round(scaled.y), (sbyte)scaled.z));
 			return CalculateIndex(tile, Data, out int index) ? tiles[index] : Tile.MaxValue;
 		}
 
@@ -312,34 +324,41 @@ namespace Jobben
 			return CalculateIndex(t.data.x, t.data.y, t.data.z, data.size);
 		}
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
-		public static int CalculateIndex(Tile t, int3 size)
+		public static int CalculateIndex(Tile t, byte3 size)
 		{
 			return CalculateIndex(t.data.x, t.data.y, t.data.z, size);
 		}
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
-		public static int CalculateIndex(int3 t, int3 size)
+		public static int CalculateIndex(sbyte3 d, byte3 size)
 		{
-			return CalculateIndex(t.x, t.y, t.z, size);
+			return CalculateIndex(d.x, d.y, d.z, size);
 		}
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
-		public static int CalculateIndex(int x, int y, int z, int3 size)
+		public static int CalculateIndex(int x, int y, int z, byte3 size)
 		{
 			if (x >= size.x || y >= size.y || z >= size.z || x < 0 || y < 0 || z < 0) { return -1; }
 			int value = (z * size.x * size.y) + (y * size.x) + x; 
 			return value;
 		}
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+		public static int CalculateIndex(sbyte x, sbyte y, sbyte z, byte3 size)
+		{
+			if (x >= size.x || y >= size.y || z >= size.z || x < 0 || y < 0 || z < 0) { return -1; }
+			int value = (z * size.x * size.y) + (y * size.x) + x;
+			return value;
+		}
 
-        public static bool HasTile(Tile t, MapData data)
+		public static bool HasTile(Tile t, MapData data)
         {
             return HasTile(t.data, data.size);
         }
-        public static bool HasTile(Tile t, int3 size)
+        public static bool HasTile(Tile t, byte3 size)
         {
             return HasTile(t.data, size);
         }
-        public static bool HasTile(int3 i, int3 size)
+        public static bool HasTile(sbyte3 d, byte3 size)
         {
-            return CalculateIndex(i, size) != -1;
+            return CalculateIndex(d, size) != -1;
         }
         #endregion
     }

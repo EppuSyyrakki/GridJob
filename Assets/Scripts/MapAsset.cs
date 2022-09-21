@@ -1,16 +1,14 @@
 ﻿using System.Collections;
+using UnityEditor;
 using UnityEngine;
 
-namespace Jobben
+namespace GridJob
 {
 	[CreateAssetMenu(fileName = "Map Asset", menuName = "GridJob/New Map Asset", order = 0)]
 	public class MapAsset : ScriptableObject
 	{
 		[SerializeField]
 		bool debugOperations = false;
-
-		[SerializeField]
-		private Graph graph;
 
 		[SerializeField]
 		private MapData data;
@@ -21,17 +19,12 @@ namespace Jobben
 		public Tile[] Tiles => tiles;
 		public MapData Data => data;
 
-        [ContextMenu("Create fresh from data")]
-		private void CreateFromMapData()
-        {
-			graph = new Graph(Data, debugOperations);
-			tiles = graph.Tiles;
-        }
-
-		[ContextMenu("Erase tiles")]
+		[ContextMenu("Erase data (Destructive!)")]
 		public void EraseAsset()
 		{
 			tiles = null;
+			data = default;
+			EditorUtility.SetDirty(this);
 		}
 
 		public bool HasData
@@ -48,6 +41,7 @@ namespace Jobben
 			this.tiles = new Tile[tiles.Length];
 			for (int i = 0; i < tiles.Length; i++) { this.tiles[i] = tiles[i]; }
 			data = mapData;
+			EditorUtility.SetDirty(this);
 			Debug.Log($"Saved {tiles.Length} tiles in {mapData.size.x} * {mapData.size.y} * {mapData.size.z} map to asset: {this}");
 		}
 

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Jobben
+namespace GridJob
 {
     [Flags]
     public enum Edge : ushort

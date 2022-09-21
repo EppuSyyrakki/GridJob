@@ -6,13 +6,16 @@ using Unity.Mathematics;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben.Jobs
+namespace GridJob.Jobs
 {
+    /// <summary>
+    /// CURRENTLY NOT WORKING. Jump search tries to do something with the neighbors array but the logic is flawed.
+    /// </summary>
     [BurstCompatible]
     public struct JumpPointPathJob : IJob
     {
         [ReadOnly]
-        private readonly bool log;
+        private readonly bool log, draw;
         [ReadOnly]
         private readonly MapData data;
         [ReadOnly]
@@ -38,7 +41,8 @@ namespace Jobben.Jobs
         /// <param name="tiles">The tiles the algorithm works with. Should be pruned to relevant tiles.</param>
         /// <param name="result">An array that the results will be written to. (Write only inside the job)</param>
         [BurstCompatible]
-        public JumpPointPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data, bool log = false)
+        public JumpPointPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+            bool log = false, bool draw = false)
         {
             this.tiles = tiles;
             this.data = data;
@@ -46,6 +50,7 @@ namespace Jobben.Jobs
             this.goal = tiles[Graph.CalculateIndex(goal, data.size)]; ;           
             this.result = result;         
             this.log = log;
+            this.draw = draw;
             frontierSize = data.size.x * data.size.y * data.size.z / 24;
             comparer = new Heuristic(goal, data);
             random = new Random(((uint)start.data.x * (uint)start.data.y * (uint)start.data.z + 1) << 4);
@@ -103,11 +108,9 @@ namespace Jobben.Jobs
                     }
 
                     jumpPoints.RemoveAt(jumpIndex);
-                    if (log)
-                    {
-                        Debug.DrawLine(Graph.TileToWorld(current, data), Graph.TileToWorld(jump, data), Color.red, 5f);
-                        msg += $"--{jump} cost {costSoFar[jump.index]}";
-                    }
+
+                    if (draw)  { Debug.DrawLine(Graph.TileToWorld(current, data), Graph.TileToWorld(jump, data), Color.red, 5f); }
+                    if (log) { msg += $"--{jump} cost {costSoFar[jump.index]}"; }       
                 }
 
                 if (log) { Debug.Log(msg + $". Frontier: {frontier.Count}/{frontierSize}"); msg = ""; }

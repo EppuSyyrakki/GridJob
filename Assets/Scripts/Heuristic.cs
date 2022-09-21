@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Unity.Mathematics;
 
-namespace Jobben
+namespace GridJob
 {
     public struct Heuristic : IComparer<Tile>
     {
@@ -32,7 +32,7 @@ namespace Jobben
         /// <summary> Calculates a height-modded manhattan distance between 2 tiles. </summary>
         public static int Manhattan(Tile a, Tile b, MapData data)
         {
-            int3 dist = a.data - b.data;
+            sbyte3 dist = a.data - b.data;
             int height = dist.y > 0 ? data.upCost : data.directCost;
             return math.abs(data.diagonalCost * math.min(dist.x, dist.z))
                 + math.abs(data.directCost * math.max(dist.x, dist.z))
