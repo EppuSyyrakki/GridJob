@@ -5,7 +5,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 
-namespace Jobben
+namespace GridJob
 {
 	public struct Graph
 	{
@@ -211,6 +211,20 @@ namespace Jobben
 			return TileType.Empty;
 		}
 		#endregion
+
+		public bool UpdateTile(Tile t)
+		{
+			try
+			{
+				tiles[t.index] = t;
+				return true;
+			}
+			catch (IndexOutOfRangeException e)
+			{
+				Debug.LogError(e);
+				return false;
+			}
+		}
 
 		public static Vector3 TileToWorld(Tile tile, MapData data)
 		{

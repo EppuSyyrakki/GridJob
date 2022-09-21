@@ -5,7 +5,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben.Jobs
+namespace GridJob.Jobs
 {
     [BurstCompatible]
     public struct DijkstraFieldJob : IJob
@@ -111,10 +111,14 @@ namespace Jobben.Jobs
                 Tile neighbor = tile + directions[i];
 
                 // Manage with just checking the edge and relying on setting them up accurately.
-                if (tile.HasAnyEdge(current) && tile.IsAnyType(TileType.WalkableTypes))
+                if (tile.HasAnyEdge(current))
                 {
                     var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
-                    neighbors.Add(validNeighbor);
+
+                    if (validNeighbor.IsAnyType(TileType.WalkableTypes))
+                    {
+                        neighbors.Add(validNeighbor);
+                    }                   
                 }
             }
 

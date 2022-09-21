@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace Jobben
+namespace GridJob
 {
     /// <summary>
     /// A struct to use as node coordinate. Reduces node size considerably compared to int3 (24 vs 96 bits)

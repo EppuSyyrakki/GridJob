@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Jobben
+namespace GridJob
 {
     [CustomEditor(typeof(GraphSystem))]
     public class GraphSystemInspector : Editor

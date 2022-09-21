@@ -1,7 +1,7 @@
 ﻿using Unity.Mathematics;
 using UnityEngine;
 
-namespace Jobben
+namespace GridJob
 {
     [System.Serializable]
     public struct MapData
@@ -18,7 +18,7 @@ namespace Jobben
         public Vector3 cellSize;
         [SerializeField, Range(0.1f, 0.5f), Tooltip("Size of the Boxcast that tries to detect obstacles inside nodes.")]
         public float obstacleCastRadius;
-        [SerializeField, Header("Layer info")]
+        [SerializeField]
         public LayerMask coverLayer, terrainLayer, climbLayer, structureLayer;
 
         [HideInInspector]

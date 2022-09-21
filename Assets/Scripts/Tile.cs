@@ -1,9 +1,8 @@
 using System;
 using UnityEngine;
 using Unity.Mathematics;
-using System.Collections.Generic;
 
-namespace Jobben
+namespace GridJob
 {
     [Serializable]
     public struct Tile : IEquatable<Tile>
@@ -19,8 +18,7 @@ namespace Jobben
 
         #region Properties
         public TileType Type => types;
-        public Edge Edges => edges;
-        public static Tile MaxValue { get { return new Tile(sbyte.MaxValue, sbyte.MaxValue, sbyte.MaxValue); } }
+        public Edge Edges => edges;       
         #endregion
 
         #region Constructors
@@ -127,6 +125,7 @@ namespace Jobben
         public static Tile nw => new Tile(-1, 0, 1);
         public static Tile up => new Tile(0, 1, 0);
         public static Tile down => new Tile(0, -1, 0);
+        public static Tile MaxValue => new Tile(sbyte.MaxValue, sbyte.MaxValue, sbyte.MaxValue);
         #endregion
 
         #region Overrides and Interfaces

@@ -7,13 +7,13 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben
+namespace GridJob
 {
     [BurstCompatible]
     struct AStarPathJob : IJob
     {
         [ReadOnly]
-        private readonly bool log, draw;
+        private readonly bool log, draw, includeStart;
         [ReadOnly]
         private readonly MapData data;
         [ReadOnly]
@@ -28,8 +28,19 @@ namespace Jobben
         [WriteOnly]
         private NativeList<Tile> result;
 
-        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data, 
-            bool log = false, bool draw = false)
+        /// <summary>
+        /// Creates a pathfinding job using A*. 
+        /// </summary>
+        /// <param name="start">Starting tile</param>
+        /// <param name="goal">Target tile</param>
+        /// <param name="tiles">Map tiles as a flat array</param>
+        /// <param name="result">List that the resulting path is written in</param>
+        /// <param name="data">Struct holding map information</param>
+        /// <param name="log">Log search to console</param>
+        /// <param name="draw">Draw debug lines for search visualization</param>
+        /// <param name="includeStartInResult">Insert the starting tile in the result list</param>
+        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+            bool log = false, bool draw = false, bool includeStartInResult = false)
         {
             int startIndex = Graph.CalculateIndex(start, data);
             int goalIndex = Graph.CalculateIndex(goal, data);
@@ -42,6 +53,7 @@ namespace Jobben
             frontierSize = data.size.x * data.size.y * data.size.z / 32;
             this.log = log;
             this.draw = draw;
+            includeStart = includeStartInResult;
         }
 
         [BurstCompatible]
@@ -112,14 +124,19 @@ namespace Jobben
 
             while (!current.Equals(start))
             {
-                if (log) { Debug.Log($"Adding {current} to result array."); }
                 result.Add(tiles[current.index]);
                 current = tiles[cameFrom[current.index]];
                 items++;
             }
 
-            if (log) { Debug.Log($"Adding {start} to result array."); }
-            result.Add(start);
+            if (includeStart)
+            {
+                result.Add(start);
+                items++;
+            }
+
+            if (log) { Debug.Log(items + " tiles added to result array."); }
+            
             frontier.Dispose();
             costSoFar.Dispose();
             cameFrom.Dispose();

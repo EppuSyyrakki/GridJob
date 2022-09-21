@@ -6,9 +6,9 @@ using Unity.Mathematics;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
-namespace Jobben.Jobs
+namespace GridJob.Jobs
 {
-    public class GraphUpdater
+    public class GraphUpdateJob
     {
 		private readonly MapData data;
         private readonly LayerMask layers;
@@ -19,7 +19,7 @@ namespace Jobben.Jobs
         private Tile[] tiles;
         private JobHandle handle;
 
-        public GraphUpdater(Tile[] tiles, MapData data, LayerMask layers)
+        public GraphUpdateJob(Tile[] tiles, MapData data, LayerMask layers)
         {
             n_commands = new NativeArray<RaycastCommand>(tiles.Length, Allocator.TempJob);
             n_result = new NativeArray<RaycastHit>(tiles.Length, Allocator.TempJob);
@@ -97,21 +97,5 @@ namespace Jobben.Jobs
             n_commands.Dispose();
             n_result.Dispose();
         }
-
-        //private bool RaycastNode(Node n, MapData data, LayerMask layers, bool debug = false)
-        //{
-        //	var pos = Graph.NodeToWorld(n, data) + Vector3.up * data.cellSize.y * 0.5f;
-        //	var halfExtents = data.cellSize * data.obstacleCastRadius;
-
-        //	if (Physics.CheckBox(pos, halfExtents, Quaternion.identity, layers))
-        //	{
-        //		if (debug) { Debug.DrawLine(pos, pos + Vector3.up, Color.red, 10f); }
-
-        //		return true;
-        //	}
-
-        //	if (debug) { Debug.DrawLine(pos, pos + Vector3.up, Color.green, 10f); }
-        //	return false;
-        //}
     }
 }
