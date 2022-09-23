@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 
@@ -67,7 +66,7 @@ namespace GridJob
 
 		#region Graph building
 		public void AutoBuild(bool log = false)
-		{
+		{			
 			LayerMask layers = Data.terrainLayer | Data.climbLayer | Data.coverLayer;
 
 			for (int i = 0; i < tiles.Length; i++)
@@ -135,25 +134,33 @@ namespace GridJob
 
 		private Tile AddLateralEdgesTowardNeighbors(Tile tile)
         {
-			// TODO: When checking out diagonal neighbors, make sure both direct neighbors next to it are free.
-			// This should prevent pathfinding cutting corners.
 			Edge toAdd = 0;
+			var directions = Tile.Directions_Lateral;
 
-			for (int i = 0; i < Tile.Directions_Lateral.Length; i++)	// loop through horizontal neighbors
+			for (int i = 0; i < directions.Length; i++)	// loop through all lateral neighbors
 			{
-				Tile dir = Tile.Directions_Lateral[i];
-
-				if (CalculateIndex(tile + dir, Data, out int neighborIndex))	// Neighbor exists
+				if (CalculateIndex(tile + directions[i], Data, out int neighborIndex))	// Neighbor exists
 				{
-					Tile neighbor = tiles[neighborIndex];
+					// if neighbor is unwalkable, move on
+					if (tiles[neighborIndex].IsAnyType(TileType.BlockedTypes)) { continue; }
 
-					if (neighbor.IsAnyType(TileType.BlockedTypes)) { continue; }	// Neighbor is unwalkable
-
-					toAdd |= Tile.DirectionToEdge(dir);	// Neighbor is walkable, add edge towards it
+					toAdd |= Tile.DirectionToEdge(directions[i]); // Neighbor is walkable, add edge towards it
 				}
 			}
 
 			tile.AddEdges(toAdd);
+			directions = Tile.Directions_Diagonal;
+
+			for (int i = 0; i < directions.Length; i++) // loop diagonal neighbors
+			{
+				Edge dir = Tile.DirectionToEdge(directions[i]); // that direction as edge
+				var adjacents = dir.Adjacents();
+
+				// if the diagonal has both adjacent edges, it wont hug a corner, let it be
+				if (tile.HasAnyEdge(adjacents.e1) && tile.HasAnyEdge(adjacents.e2)) { continue; }
+
+				tile.RemoveEdges(dir);	// the diagonal lacks at least one adjacent (direct) edge so remove it.
+			}
 			return tile;
 		}
 
@@ -306,6 +313,7 @@ namespace GridJob
 		{
 			var d = dir.Normalized().data;
 			if (d.y > 0) { return data.upCost; }
+			else if (d.y < 0) { return 0; }	// simple way to prevent path ending "in the air".
 			if (math.abs(d.x) + math.abs(d.z) == 1) { return data.directCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 2) { return data.diagonalCost; }
 

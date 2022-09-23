@@ -2,8 +2,6 @@
 using UnityEngine;
 using Unity.Jobs;
 using Unity.Collections;
-using Unity.Mathematics;
-using Random = Unity.Mathematics.Random;
 
 namespace GridJob.Jobs
 {
@@ -12,6 +10,8 @@ namespace GridJob.Jobs
     {
         [ReadOnly]
         private readonly bool log;
+        [ReadOnly]
+        private readonly bool includeStart;
         [ReadOnly]
         private readonly MapData data;
         [ReadOnly]
@@ -22,7 +22,6 @@ namespace GridJob.Jobs
         private NativeArray<Tile> tiles;
 
         private Heuristic comparer;
-        private Random random;
 
         [WriteOnly]
         private NativeList<Tile> result;
@@ -35,61 +34,71 @@ namespace GridJob.Jobs
         /// <param name="tiles">The tiles the algorithm works with.</param>
         /// <param name="result">An array that the results will be written to. (Write only inside the job)</param>
         /// <param name="data">The struct holding information about map size.</param>
+        /// <param name="includeStart">Include the center tile in the result list.</param>
         [BurstCompatible]
-        public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data, bool log = false)
+        public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+            bool log = false, bool includeStart = false)
         {
             this.center = center;
             maxCost = range * data.directCost;
             this.data = data;
             this.tiles = tiles;
             this.log = log;
+            this.includeStart = includeStart;
             this.result = result;
             comparer = new Heuristic(center, data);
-            random = new Random(((uint)center.data.x * (uint)center.data.y * (uint)center.data.z + 1) << 4);
         }
 
         [BurstCompatible]
         public void Execute()
         {
             NativeArray<int> costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
-            NativeList<int> closed = new NativeList<int>(maxCost * maxCost, Allocator.Temp);
-            Tile begin = tiles[Graph.CalculateIndex(center, data)];
+            NativeList<int> result = new NativeList<int>(maxCost * data.directCost, Allocator.Temp);
             var frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, maxCost * maxCost, comparer);
+            int examined = 0;
+            int items = 0;
             for (int i = 0; i < tiles.Length; i++) { costSoFar[i] =  int.MaxValue; }
 
-            Tile current = begin;
-            costSoFar[current.index] = 0;
-            frontier.Insert(current);          
-            string msg = "";
+            Tile begin = tiles[Graph.CalculateIndex(center, data)];
+            costSoFar[begin.index] = 0;
+            frontier.Insert(begin);
+            if (includeStart) { result.Add(begin.index); }
 
             while (frontier.Count > 0)
             {
-                current = frontier.Pop();
-                result.Add(current);
+                string msg = "";
+                var current = frontier.Pop();
                 NativeList<Tile> neighbors = GetNeighbors(current);
-                if (log) { msg += ("DFJ---Examining: " + current + " with " + neighbors.Length + " neighbors: "); }
+                if (log) { msg += ("DFJ Examining: " + current + " with " + neighbors.Length + " neighbors: "); }
 
-                while (neighbors.Length > 0)  // Loop through all available neighbors
-                {                   
-                    int neighborIndex = random.NextInt(0, neighbors.Length);                 
-                    Tile next = neighbors[neighborIndex];
+                for (int i = 0; i < neighbors.Length; i++)  // Loop through all available neighbors
+                {                         
+                    Tile next = neighbors[i];
                     int costToNext = costSoFar[current.index] + Graph.Cost(next - current, data);
+                    examined++;
 
-                    if (costToNext <= maxCost && !closed.Contains(next.index))
+                    if (costToNext <= maxCost && !result.Contains(next.index))
                     {
-                        // result.Add(next);
-                        frontier.Insert(next);
+                        result.Add(next.index);
+                        items++;
+                        frontier.Insert(in next);
                         costSoFar[next.index] = costToNext;
                     }
 
-                    closed.Add(next.index);
-                    neighbors.RemoveAt(neighborIndex);
                     if (log) { msg += $"--{next} cost {costSoFar[next.index]}/{maxCost}"; }
                 }
-               
+
                 neighbors.Dispose();
                 if (log) { Debug.Log(msg); }
             }
+
+            for (int i = 0; i < result.Length; i++)
+            {
+                int index = result[i];
+                this.result.Add(tiles[index]);
+            }
+            
+            if (log) { Debug.Log($"{items} tiles added to results. Examined {examined} tiles in total."); }
         }
 
         /// <summary>

@@ -4,12 +4,12 @@ using UnityEngine;
 
 namespace GridJob
 {
-    [CustomEditor(typeof(GraphSystem))]
-    public class GraphSystemInspector : Editor
+    [CustomEditor(typeof(GridEditor))]
+    public class GridEditorInspector : Editor
     {	
         private bool editMode = false;
 
-        private GraphSystem gs;
+        private GridEditor gs;
         private Tile original = Tile.MaxValue;
         private Tile edited = Tile.MaxValue;
 
@@ -17,7 +17,7 @@ namespace GridJob
 		private void OnEnable()
 		{
 			SceneView.duringSceneGui += DuringScene;
-			gs = target as GraphSystem;
+			gs = target as GridEditor;
             if (!gs.Graph.IsInitialized) { gs.LoadGraph(); }
 		}
 

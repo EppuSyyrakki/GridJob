@@ -19,7 +19,12 @@ namespace GridJob
         public void RequestPath(Tile target)
         {
             var request = new GridJobItem(Current, target, OnPathComplete, gameObject.name);
-            GridJobScheduler.PathQueue.Enqueue(request);
+            Grid.PathQueue.Enqueue(request);
+        }
+
+        public void RequestField(Tile center)
+        {
+
         }
     }
 }

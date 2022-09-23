@@ -58,6 +58,7 @@ namespace GridJob
         public void RemoveEdges(Edge e) { edges &= ~e; }
         public void ToggleEdges(Edge e) { edges ^= e; }        
         public bool HasAnyEdge(Edge e) { return (edges & e) > 0; }
+        public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
         public bool HasEdgeTo(Tile other)
         {
             Tile dir = (this - other);
@@ -92,10 +93,9 @@ namespace GridJob
 
             return zero;
         }
-        public static Edge DirectionToEdge(Tile node)
+        public static Edge DirectionToEdge(Tile tile)
         {
-            Tile n = node.Normalized();
-
+            Tile n = tile.Normalized();
             var directions = Directions_All;
 
             for (int i = 0; i < directions.Length; i++)

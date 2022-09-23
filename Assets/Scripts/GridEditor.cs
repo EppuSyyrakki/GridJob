@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace GridJob
 {
-    public class GraphSystem : MonoBehaviour
+    public class GridEditor : MonoBehaviour
     {
         [SerializeField]
         bool logPathfinding = false, drawPathfinding = false, showAllTiles = false, showResult = false;

@@ -64,6 +64,7 @@ namespace GridJob
             NativeArray<int> cameFrom = new NativeArray<int>(tiles.Length, Allocator.Temp);
             NativeArray<int> costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
             NativeHeap<Tile, Heuristic> frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, frontierSize, comparer);
+            int examined = 0;
             for (int i = 0; i < tiles.Length; i++)
             {
                 costSoFar[i] = int.MaxValue;
@@ -101,6 +102,7 @@ namespace GridJob
                     Tile next = neighbors[neighborIndex];
                     int costToNeighbor = Graph.Cost(next - current, data);
                     int newCost = costSoFar[current.index] + costToNeighbor;
+                    examined++;
 
                     if (newCost < costSoFar[next.index])
                     {
@@ -115,6 +117,7 @@ namespace GridJob
                     if (draw) { Debug.DrawLine(Graph.TileToWorld(current, data), Graph.TileToWorld(next, data), Color.red, 10f); }
                     if (log) { msg += $"--{next} cost {costSoFar[next.index]}"; }
                 }
+
 
                 if (log) { Debug.Log(msg + $". Frontier: {frontier.Count}/{frontierSize}"); msg = ""; }
                 neighbors.Dispose();
@@ -135,7 +138,7 @@ namespace GridJob
                 items++;
             }
 
-            if (log) { Debug.Log(items + " tiles added to result array."); }
+            if (log) { Debug.Log($"{items} tiles added to results. Examined {examined} tiles in total."); }
             
             frontier.Dispose();
             costSoFar.Dispose();
@@ -159,12 +162,10 @@ namespace GridJob
                 Edge current = (Edge)(1 << i);
                 Tile neighbor = tile + directions[i];
 
-                // if (HasTile(neighbor) && t.HasEdge(current) && !t.occupied) For posterity.
-                // Manage with just checking the edge and relying on setting them up accurately.
                 if (tile.HasAnyEdge(current) && tile.IsAnyType(TileType.WalkableTypes))
                 {
-                    var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
-                    neighbors.Add(validNeighbor);
+                    var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];     
+                    neighbors.Add(validNeighbor);                                    
                 }
             }
 

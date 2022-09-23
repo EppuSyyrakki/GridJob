@@ -8,7 +8,7 @@ using GridJob.Jobs;
 
 namespace GridJob
 {
-    public class GridJobScheduler : IDisposable
+    public class Grid : IDisposable
     {   
         private const int MAX_PATHJOBS = 4;
         private const int MAX_FIELDJOBS = 2;
@@ -34,7 +34,7 @@ namespace GridJob
         public static Queue<GridJobItem> FieldQueue { get; private set; }
         public static MapData Data { get; private set; }
 
-        public GridJobScheduler(bool log = false, bool draw = false)
+        public Grid(bool log = false, bool draw = false)
         {
             logPathfinding = log;
             drawPathfinding = draw;
