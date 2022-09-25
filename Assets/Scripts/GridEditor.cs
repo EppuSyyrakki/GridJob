@@ -169,7 +169,7 @@ namespace GridJob
         }
         #endregion
 
-        private bool SchedulePathJob(Tile start, Tile goal)
+        private bool SchedulePathJob(Tile start, Tile goal, int dropDepth = 1)
         {
             var mDist = Heuristic.Manhattan(goal, start, Graph.Data);
             var maxDistance = Mathf.Max(Graph.Data.size.x, Graph.Data.size.y) * Graph.Data.diagonalCost;
@@ -184,12 +184,12 @@ namespace GridJob
 
             n_pathResult = new NativeList<Tile>(Graph.Data.maxPathLength, Allocator.TempJob);
             this.start = start;           
-            var job = new AStarPathJob(start, goal, n_tiles, n_pathResult, Graph.Data, logPathfinding, drawPathfinding);
+            var job = new AStarPathJob(start, goal, n_tiles, n_pathResult, Graph.Data, dropDepth, logPathfinding, drawPathfinding);
             pathHandle = job.Schedule();
             return true;
         }
 
-        private bool ScheduleFieldJob(Tile center, int fieldRange)
+        private bool ScheduleFieldJob(Tile center, int fieldRange, int dropDepth = 1)
         {           
             if (logPathfinding)
             {
@@ -202,7 +202,7 @@ namespace GridJob
 
             n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
             start = center;        
-            var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, Graph.Data, logPathfinding);
+            var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, Graph.Data, dropDepth, logPathfinding, false);
             fieldHandle = job.Schedule();
 
             return true;

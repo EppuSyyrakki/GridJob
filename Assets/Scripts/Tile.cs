@@ -18,7 +18,7 @@ namespace GridJob
 
         #region Properties
         public TileType Type => types;
-        public Edge Edges => edges;       
+        public Edge Edges => edges;
         #endregion
 
         #region Constructors
@@ -61,7 +61,7 @@ namespace GridJob
         public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
         public bool HasEdgeTo(Tile other)
         {
-            Tile dir = (this - other);
+            Tile dir = this - other;
             sbyte3 abs = dir.data.Abs;
 
             if (abs.x > 1 || abs.y > 1 || abs.z > 1) { Debug.LogWarning(this + " is checking edges to non-adjacent node."); }
@@ -136,11 +136,11 @@ namespace GridJob
             return a;
         }
 
-        /// <summary> NOTE: Copies node data from Node a. </summary>
+        /// <summary> NOTE: Copies node data from Node b </summary>
         public static Tile operator -(Tile a, Tile b)
         {
-            a.data = new sbyte3(a.data.x - b.data.x, a.data.y - b.data.y, a.data.z - b.data.z);
-            return a;
+            b.data = new sbyte3(a.data.x - b.data.x, a.data.y - b.data.y, a.data.z - b.data.z);
+            return b;
         }
 
         /// <summary> NOTE: Copies node a data to new node. </summary>

@@ -94,19 +94,6 @@ namespace GridJob
             }
         }
 
-        /// <summary> Disables edges at size limits. </summary>
-        private Tile RemoveLimitEdges(Tile tile)
-        {
-            sbyte3 d = tile.data;
-
-            if (d.x == 0) { tile.RemoveEdges(Edge.SouthWest | Edge.West | Edge.NorthWest); }
-            else if (d.x == Data.size.x - 1) { tile.RemoveEdges(Edge.NorthEast | Edge.East | Edge.SouthEast); }
-            if (d.z == 0) { tile.RemoveEdges(Edge.SouthEast | Edge.South | Edge.SouthWest); }
-            else if (d.z == Data.size.z - 1) { tile.RemoveEdges(Edge.NorthWest | Edge.North | Edge.NorthEast); }
-
-            return tile;
-        }
-
         private Tile HandleEmptys(Tile tile)
 		{
 			if (tile.data.y == 0)	// Bottom floor, no need to check for neighbor below this
@@ -115,51 +102,49 @@ namespace GridJob
 				return tile;
 			}
 
-			if (CalculateIndex(tile + Tile.down, Data, out int belowIndex)) // A tile exists below this one
+			if (!CalculateIndex(tile + Tile.down, Data, out int belowIndex)) { return tile; } 
+				
+			Tile below = tiles[belowIndex]; // A tile exists below this one
+
+			if (below.IsAnyType(TileType.WalkableTypes))	// Tile below is free
 			{
-				Tile below = tiles[belowIndex]; 
-
-				if (below.IsAnyType(TileType.WalkableTypes))	// Tile below is free
-				{
-					tile.AddEdges(Edge.Down);
-					tile.AddType(TileType.Jump);
-					return tile;
-				}
-
-				tile = AddLateralEdgesTowardNeighbors(tile);	// Tile below is blocked         
+				tile.AddEdges(Edge.Down);
+				tile.AddType(TileType.Jump);
+				return tile;
 			}
 
+			tile = AddLateralEdgesTowardNeighbors(tile);	// Tile below is blocked
 			return tile;
 		}
 
 		private Tile AddLateralEdgesTowardNeighbors(Tile tile)
         {
-			Edge toAdd = 0;
 			var directions = Tile.Directions_Lateral;
 
-			for (int i = 0; i < directions.Length; i++)	// loop through all lateral neighbors
-			{
-				if (CalculateIndex(tile + directions[i], Data, out int neighborIndex))	// Neighbor exists
+			for (int i = 0; i < directions.Length; i++) // loop through all lateral neighbors
+			{  
+				if (CalculateIndex(tile + directions[i], Data, out int neighborIndex))
 				{
-					// if neighbor is unwalkable, move on
-					if (tiles[neighborIndex].IsAnyType(TileType.BlockedTypes)) { continue; }
+					Tile neighbor = tiles[neighborIndex];
 
-					toAdd |= Tile.DirectionToEdge(directions[i]); // Neighbor is walkable, add edge towards it
-				}
+					if (neighbor.IsAnyType(TileType.BlockedTypes)) { continue; }
+
+					Edge e = Tile.DirectionToEdge(directions[i]);
+					tile.AddEdges(e); // not blocked, add edge
+				}					
 			}
 
-			tile.AddEdges(toAdd);
 			directions = Tile.Directions_Diagonal;
 
 			for (int i = 0; i < directions.Length; i++) // loop diagonal neighbors
 			{
-				Edge dir = Tile.DirectionToEdge(directions[i]); // that direction as edge
-				var adjacents = dir.Adjacents();
+				Edge e = Tile.DirectionToEdge(directions[i]);
+				var adjacents = e.Adjacents(); 
 
-				// if the diagonal has both adjacent edges, it wont hug a corner, let it be
+				// if it has both adjacent edges, it wont hug a corner, let it be
 				if (tile.HasAnyEdge(adjacents.e1) && tile.HasAnyEdge(adjacents.e2)) { continue; }
 
-				tile.RemoveEdges(dir);	// the diagonal lacks at least one adjacent (direct) edge so remove it.
+				tile.RemoveEdges(e);	// it lacks at least one adjacent direct edge, remove it.
 			}
 			return tile;
 		}
@@ -167,27 +152,49 @@ namespace GridJob
 		/// <summary> Enables Edge.up, finds a blocked direction and enables the above tile edge to that direction. </summary>
 		private Tile HandleClimb(Tile tile)
 		{
-			tile = AddLateralEdgesTowardNeighbors(tile);
+			Tile above, below = new Tile();
 
-			if (!CalculateIndex(tile + Tile.up, Data, out int aboveIndex)) { return tile; }
-
-			tile.AddEdges(Edge.Up); // Above tile exists.
-			Tile above = tiles[aboveIndex];
-			var directions = Tile.Directions_Direct;    // Only scan the main directions for exiting climb tiles (N E S W)
-
-			for (int i = 0; i < directions.Length; i++)
+			if (CalculateIndex(tile + Tile.up, Data, out int aboveIndex)) 
 			{
-				// Loop neighbors, find a blocked one and add the direction to that as edge to above tile
-				if (!CalculateIndex(tile + directions[i], Data, out int neighborIndex)) { continue; }
+				above = tiles[aboveIndex];
+				tile.AddEdges(Edge.Up);				
 
-				Tile neighbor = tiles[neighborIndex];  // Neighbor exists.
-
-				if (neighbor.IsAnyType(TileType.BlockedTypes)) // It's blocked
+				if (above.IsAnyType(TileType.Jump)) 
 				{
-					Edge edge = Tile.DirectionToEdge(directions[i]);
-					above.AddEdges(edge);
-					tiles[above.index] = above;
+					var directions = Tile.Directions_Direct;    // Only scan (N E S W) exiting climb tiles 
+
+					for (int i = 0; i < directions.Length; i++)
+					{
+						// Loop neighbors, find any blocked and add the direction to that as edge to above tile
+						if (!CalculateIndex(tile + directions[i], Data, out int neighborIndex)) { continue; }
+
+						Tile neighbor = tiles[neighborIndex];  // Neighbor exists.
+
+						if (!neighbor.IsAnyType(TileType.BlockedTypes)) { continue; }	// It's free
+						
+						Edge edge = Tile.DirectionToEdge(directions[i]);
+						above.AddEdges(edge);
+						tiles[above.index] = above;	
+					}
 				}
+			}
+
+			if (CalculateIndex(tile + Tile.down, Data, out int belowIndex)) 
+			{
+				below = tiles[belowIndex];	// A tile below exists
+				
+				if (below.IsAnyType(TileType.BlockedTypes))
+				{ 					
+					tile = AddLateralEdgesTowardNeighbors(tile);	// climb tiles above blockeds can be exited in any dir
+				}
+				else if (below.IsAnyType(TileType.WalkableTypes))
+                {
+					tile.AddEdges(Edge.Down);	// climb tiles over emptys can only be travelled down
+                }
+			}
+            else
+            {
+				tile = AddLateralEdgesTowardNeighbors(tile);
 			}
 
 			return tile;
@@ -311,9 +318,9 @@ namespace GridJob
 		/// <summary> Simple conversion from a direction to a cost. </summary>
 		public static int Cost(Tile dir, MapData data)
 		{
+			if (dir.IsAnyType(TileType.Jump)) { return 0; }
 			var d = dir.Normalized().data;
 			if (d.y > 0) { return data.upCost; }
-			else if (d.y < 0) { return 0; }	// simple way to prevent path ending "in the air".
 			if (math.abs(d.x) + math.abs(d.z) == 1) { return data.directCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 2) { return data.diagonalCost; }
 

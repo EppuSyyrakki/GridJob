@@ -20,6 +20,8 @@ namespace GridJob.Jobs
         private readonly int maxCost;
         [ReadOnly]
         private NativeArray<Tile> tiles;
+        [ReadOnly]
+        private int dropDepth;
 
         private Heuristic comparer;
 
@@ -37,12 +39,13 @@ namespace GridJob.Jobs
         /// <param name="includeStart">Include the center tile in the result list.</param>
         [BurstCompatible]
         public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
-            bool log = false, bool includeStart = false)
+            int dropDepth = 1, bool log = false, bool includeStart = false)
         {
             this.center = center;
             maxCost = range * data.directCost;
             this.data = data;
             this.tiles = tiles;
+            this.dropDepth = dropDepth;
             this.log = log;
             this.includeStart = includeStart;
             this.result = result;
@@ -105,7 +108,7 @@ namespace GridJob.Jobs
         /// Returns only valid (movable) neighbor copies from the grid. Checks for node edges and grid limits.
         /// </summary>
         [BurstCompatible]
-        private NativeList<Tile> GetNeighbors(Tile tile, int dropDepth = 2)
+        private NativeList<Tile> GetNeighbors(Tile tile)
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
@@ -117,22 +120,35 @@ namespace GridJob.Jobs
             for (int i = 0; i < directions.Length; i++)
             {
                 Edge current = (Edge)(1 << i);
-                Tile neighbor = tile + directions[i];
 
-                // Manage with just checking the edge and relying on setting them up accurately.
                 if (tile.HasAnyEdge(current))
                 {
-                    var validNeighbor = tiles[Graph.CalculateIndex(neighbor, data.size)];
+                    var neighbor = tiles[Graph.CalculateIndex(tile + directions[i], data.size)];
 
-                    if (validNeighbor.IsAnyType(TileType.WalkableTypes))
-                    {
-                        neighbors.Add(validNeighbor);
-                    }                   
+                    if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
+                    else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
+
+                    neighbors.Add(neighbor);
                 }
             }
 
             directions.Dispose();
             return neighbors;
+        }
+
+        private bool CanDrop(Tile t)
+        {
+            for (int i = 0; i < dropDepth; i++)
+            {
+                if (Graph.CalculateIndex(t + Tile.down, data, out int belowIndex))
+                {
+                    t = tiles[belowIndex];
+
+                    if (t.IsAnyType(TileType.Jump)) { return false; }
+                }
+            }
+
+            return true;
         }
     }
 }
