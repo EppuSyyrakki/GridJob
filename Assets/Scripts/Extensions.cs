@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 
 namespace GridJob
 {
-	public static class Extensions
+    public static class Extensions
 	{
 		public static void AddOrModify<T1, T2>(this Dictionary<T1, T2> dict, T1 key, T2 value)
 		{

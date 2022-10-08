@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
-using UnityEngine.Assertions;
 using GridJob.Jobs;
+using Unity.Mathematics;
 
 namespace GridJob
 {
@@ -70,7 +70,7 @@ namespace GridJob
         private JobHandle SchedulePathJob(Tile start, Tile goal, ref NativeList<Tile> result, int dropDepth = 1)
         {
             var mDist = Heuristic.Manhattan(goal, start, graph.Data);
-            var maxDistance = Mathf.Max(graph.Data.size.x, graph.Data.size.y) * graph.Data.diagonalCost;
+            var maxDistance = math.max((int)graph.Data.size.x, graph.Data.size.y) * graph.Data.diagonalCost;
 
             if (logPathfinding)
             {

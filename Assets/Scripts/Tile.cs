@@ -14,35 +14,59 @@ namespace GridJob
         [SerializeField]
         public Edge edges;
         [SerializeField]
+        public Edge covers;
+        [SerializeField]
         public int index;
 
         #region Properties
         public TileType Type => types;
         public Edge Edges => edges;
+        public Edge Covers => covers;
         #endregion
 
         #region Constructors
-        public Tile(int x, int y, int z, Edge edges = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(int x, int y, int z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
         {
             data = new sbyte3(x, y, z);
             types = type;
             this.edges = edges;
+            this.covers = covers;
+            this.index = index;            
+        }
+
+        public Tile(Vector3 v, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        {
+            data = new sbyte3((sbyte)math.round(v.x), (sbyte)math.round(v.y), (sbyte)math.round(v.z));
+            types = type;
+            this.edges = edges;
+            this.covers = covers;
+            this.index = index;           
+        }
+
+        public Tile(float x, float y, float z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        {
+            data = new sbyte3((sbyte)math.round(x), (sbyte)math.round(y), (sbyte)math.round(z));
+            types = type;
+            this.edges = edges;
+            this.covers = covers;
             this.index = index;
         }
 
-        public Tile(sbyte x, sbyte y, sbyte z, Edge edges = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(sbyte x, sbyte y, sbyte z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
         {
             data = new sbyte3(x, y, z);
             types = type;
             this.edges = edges;
+            this.covers = covers;
             this.index = index;
         }
 
-        public Tile(sbyte3 data, Edge edges = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(sbyte3 data, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
         {
             this.data = data;
             types = type;
             this.edges = edges;
+            this.covers = covers;
             this.index = index;
         }
         #endregion
@@ -54,17 +78,21 @@ namespace GridJob
         /// <summary> Returns true if tile has any same flags set as param types. </summary>
         public bool IsAnyType(TileType types) { return (types & this.types) > 0; }
         public void SetEdges(Edge e) { edges = e; }
+        public void SetCovers(Edge c) { covers = c; }
         public void AddEdges(Edge e) { edges |= e; }
+        public void AddCovers(Edge c) { covers |= c; }
         public void RemoveEdges(Edge e) { edges &= ~e; }
-        public void ToggleEdges(Edge e) { edges ^= e; }        
-        public bool HasAnyEdge(Edge e) { return (edges & e) > 0; }
-        public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
+        public void RemoveCovers(Edge c) { covers &= ~c; }
+        public void ToggleEdges(Edge e) { edges ^= e; }    
+        public void ToggleCovers(Edge c) { covers ^= c; }
+        public bool HasAnyEdge(Edge e) { return (edges & covers & e) > 0; }
+        public bool HasNoEdge(Edge e) { return (edges & covers & e) == 0 ; }
         public bool HasEdgeTo(Tile other)
         {
             Tile dir = this - other;
             sbyte3 abs = dir.data.Abs;
 
-            if (abs.x > 1 || abs.y > 1 || abs.z > 1) { Debug.LogWarning(this + " is checking edges to non-adjacent node."); }
+            if (abs.x > 1 || abs.y > 1 || abs.z > 1) { return false; }  // other is non-adjacent 
 
             for (int i = 0; i < Directions_All.Length; i++) // i == 4 is at northeast
             {
@@ -79,8 +107,12 @@ namespace GridJob
             return false;
         }
 
-        public Tile Normalized() { return new Tile(data.Normalized, Edges, types, index); }       
-        public float Magnitude() { return math.abs(data.x * math.SQRT2 + data.y * math.SQRT2 + data.z * math.SQRT2); }
+        public Tile Normalized() { return new Tile(data.Normalized, edges, covers, types, index); }       
+        public float Magnitude() 
+        {
+            var d = data.Abs;
+            return math.sqrt(math.pow(d.x, 2) + math.pow(d.y, 2) + math.pow(d.z, 2));
+        }
         public static Tile EdgeToDirection(Edge e)
         {
             var directions = Directions_All;
@@ -172,4 +204,23 @@ namespace GridJob
         }
         #endregion
     }
+
+    /// <summary>
+    /// Helper struct to be able to use Unity.Mathematics lerp functions when getting lines of tiles.
+    /// </summary>
+    //public struct FractionTile
+    //{
+    //    public float3 data;
+
+    //    public FractionTile(float3 data) { this.data = data; }
+
+    //    public FractionTile(float x, float y, float z) { data = new float3(x, y, z); }
+
+    //    public FractionTile(Vector3 v) { data = new float3(v); }
+
+    //    public static implicit operator Tile(FractionTile ft)
+    //    { 
+    //        return new Tile((int)ft.data.x, (int)ft.data.y, (int)ft.data.z);
+    //    }
+    //}
 }

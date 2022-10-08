@@ -62,7 +62,7 @@ namespace GridJob.Jobs
             int items = 0;
             for (int i = 0; i < tiles.Length; i++) { costSoFar[i] =  int.MaxValue; }
 
-            Tile begin = tiles[Graph.CalculateIndex(center, data)];
+            Tile begin = tiles[Graph.GetIndex(center, data)];
             costSoFar[begin.index] = 0;
             frontier.Insert(begin);
             if (includeStart) { result.Add(begin.index); }
@@ -112,7 +112,7 @@ namespace GridJob.Jobs
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
-                Tile.n, Tile.e, Tile.s, Tile.w, Tile.ne, Tile.se, Tile.sw, Tile.nw, Tile.up, Tile.down
+                Tile.n, Tile.e, Tile.s, Tile.w, Tile.up, Tile.down, Tile.ne, Tile.se, Tile.sw, Tile.nw,
             };
 
             var neighbors = new NativeList<Tile>(10, Allocator.Temp);
@@ -123,7 +123,7 @@ namespace GridJob.Jobs
 
                 if (tile.HasAnyEdge(current))
                 {
-                    var neighbor = tiles[Graph.CalculateIndex(tile + directions[i], data.size)];
+                    var neighbor = tiles[Graph.GetIndex(tile + directions[i], data.size)];
 
                     if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
                     else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
@@ -140,7 +140,7 @@ namespace GridJob.Jobs
         {
             for (int i = 0; i < dropDepth; i++)
             {
-                if (Graph.CalculateIndex(t + Tile.down, data, out int belowIndex))
+                if (Graph.GetIndex(t + Tile.down, data, out int belowIndex))
                 {
                     t = tiles[belowIndex];
 

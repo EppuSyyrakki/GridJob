@@ -44,8 +44,8 @@ namespace GridJob
         public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
             int dropDepth = 1, bool log = false, bool draw = false, bool includeStartInResult = false)
         {
-            int startIndex = Graph.CalculateIndex(start, data);
-            int goalIndex = Graph.CalculateIndex(goal, data);
+            int startIndex = Graph.GetIndex(start, data);
+            int goalIndex = Graph.GetIndex(goal, data);
             Assert.IsTrue(startIndex != -1 && goalIndex != -1);
             this.data = data;
             this.start = tiles[startIndex];
@@ -156,7 +156,7 @@ namespace GridJob
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
-                Tile.n, Tile.e, Tile.s, Tile.w, Tile.ne, Tile.se, Tile.sw, Tile.nw, Tile.up, Tile.down
+                Tile.n, Tile.e, Tile.s, Tile.w, Tile.up, Tile.down, Tile.ne, Tile.se, Tile.sw, Tile.nw, 
             };
 
             var neighbors = new NativeList<Tile>(10, Allocator.Temp);
@@ -167,7 +167,7 @@ namespace GridJob
 
                 if (tile.HasAnyEdge(current))
                 {
-                    var neighbor = tiles[Graph.CalculateIndex(tile + directions[i], data.size)];
+                    var neighbor = tiles[Graph.GetIndex(tile + directions[i], data.size)];
 
                     if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
                     else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
@@ -185,7 +185,7 @@ namespace GridJob
         {
             for (int i = 0; i < dropDepth; i++)
             {
-                if (Graph.CalculateIndex(t + Tile.down, data, out int belowIndex))
+                if (Graph.GetIndex(t + Tile.down, data, out int belowIndex))
                 {
                     t = tiles[belowIndex];
 

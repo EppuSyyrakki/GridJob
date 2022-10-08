@@ -10,14 +10,14 @@ namespace GridJob
         East = 1 << 1,
         South = 1 << 2,
         West = 1 << 3,
-        NorthEast = 1 << 4,
-        SouthEast = 1 << 5,
-        SouthWest = 1 << 6,
-        NorthWest = 1 << 7,
-        Up = 1 << 8,
-        Down = 1 << 9,
-        AllSameLevel = AllDirect | AllDiagonal,
+        Up = 1 << 4,
+        Down = 1 << 5,
+        NorthEast = 1 << 6,
+        SouthEast = 1 << 7,
+        SouthWest = 1 << 8,
+        NorthWest = 1 << 9,
         All = North | East | South | West | NorthEast | SouthEast | SouthWest | NorthWest | Up | Down,
+        AllSameLevel = AllDirect | AllDiagonal,       
         AllDirect = North | East | South | West,
         AllDiagonal = NorthEast | SouthEast | SouthWest | NorthWest
     }
@@ -25,7 +25,8 @@ namespace GridJob
     [Flags]
     public enum TileType : byte
     {
-        None = 0,        
+        None = 0,
+        All = Empty | Terrain | Cover | Structure | Climb | Jump | Occupied,
         WalkableTypes = Climb | Empty | Jump,
         BlockedTypes = Terrain | Cover | Structure | Occupied,
         Empty = 1 << 0,

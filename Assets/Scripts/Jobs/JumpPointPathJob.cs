@@ -46,8 +46,8 @@ namespace GridJob.Jobs
         {
             this.tiles = tiles;
             this.data = data;
-            this.start = tiles[Graph.CalculateIndex(start, data.size)];
-            this.goal = tiles[Graph.CalculateIndex(goal, data.size)]; ;           
+            this.start = tiles[Graph.GetIndex(start, data.size)];
+            this.goal = tiles[Graph.GetIndex(goal, data.size)]; ;           
             this.result = result;         
             this.log = log;
             this.draw = draw;
@@ -61,8 +61,8 @@ namespace GridJob.Jobs
         {
             var cameFrom = new NativeArray<int>(tiles.Length, Allocator.Temp);
             var costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
-            Tile begin = tiles[Graph.CalculateIndex(start, data.size)];
-            Tile target = tiles[Graph.CalculateIndex(goal, data.size)];
+            Tile begin = tiles[Graph.GetIndex(start, data.size)];
+            Tile target = tiles[Graph.GetIndex(goal, data.size)];
             var frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, frontierSize, comparer);
 
             for (int i = 0; i < tiles.Length; i++)
@@ -142,7 +142,7 @@ namespace GridJob.Jobs
         {
             var directions = new NativeList<Tile>(10, Allocator.Temp)
             {   // These should be in the same order as the Edges enum for the bit-shift looping to work
-                Tile.n, Tile.e, Tile.s, Tile.w, Tile.ne, Tile.se, Tile.sw, Tile.nw, Tile.up, Tile.down 
+                Tile.n, Tile.e, Tile.s, Tile.w, Tile.up, Tile.down, Tile.ne, Tile.se, Tile.sw, Tile.nw,
             };  
 
             var neighbors = new NativeList<Tile>(10, Allocator.Temp);
@@ -153,7 +153,7 @@ namespace GridJob.Jobs
 
                 if (current.HasAnyEdge(edge))
                 {
-                    neighbors.Add(tiles[Graph.CalculateIndex(current + directions[i], data)]);
+                    neighbors.Add(tiles[Graph.GetIndex(current + directions[i], data)]);
                 }
             }
            
@@ -180,7 +180,7 @@ namespace GridJob.Jobs
 
         private Tile Jump(in Tile current, Edge direction)
         {
-            if (!Graph.CalculateIndex(current + direction, data, out int index)) { return Tile.MaxValue; }
+            if (!Graph.GetIndex(current + direction, data, out int index)) { return Tile.MaxValue; }
 
             // Has edge to that direction
             Tile tile = tiles[index];
@@ -229,7 +229,7 @@ namespace GridJob.Jobs
             }
 
             // Check for a free tile in tile + saved blockage + direction
-            if (!Graph.CalculateIndex(tile + foundBlocked + dir, data, out int index)) { return false; }
+            if (!Graph.GetIndex(tile + foundBlocked + dir, data, out int index)) { return false; }
             else if (tiles[index].IsAnyType(TileType.WalkableTypes)) { return true; }
 
             return false;

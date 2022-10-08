@@ -3,7 +3,7 @@ using Unity.Jobs;
 
 namespace GridJob
 {
-    public enum JobType { None, Field, Path }
+    public enum JobType { None, Field, Path, Fov }
 
     public class GridJobItem
     {

@@ -61,7 +61,7 @@ namespace GridJob
 
 		public bool UpdateTile(Tile tile)
         {
-			if (!Graph.CalculateIndex(tile, data, out int index)) { return false; }
+			if (!Graph.GetIndex(tile, data, out int index)) { return false; }
 
 			tiles[index] = tile;
 			return true;
