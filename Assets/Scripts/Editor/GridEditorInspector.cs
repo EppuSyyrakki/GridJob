@@ -7,24 +7,24 @@ namespace GridJob
     [CustomEditor(typeof(GridEditor))]
     public class GridEditorInspector : Editor
     {	
-        private bool editMode = false;
-
-        private GridEditor gs;
+        private GridEditor ge;
         private Tile original = Tile.MaxValue;
         private Tile edited = Tile.MaxValue;
+        private bool EditMode = false;
 
 		#region Unity messages and delegates
+
 		private void OnEnable()
 		{
 			SceneView.duringSceneGui += DuringScene;
-			gs = target as GridEditor;
-            if (!gs.Graph.IsInitialized) { gs.LoadGraph(); }
-		}
+			ge = target as GridEditor;
+            if (!ge.Graph.IsInitialized) { ge.LoadGraph(); }
+        }
 
 		private void OnDisable()
 		{
 			SceneView.duringSceneGui -= DuringScene;
-		}
+        }
 
 		/// <summary>
 		/// Delegate method that is called on editor update.
@@ -32,12 +32,23 @@ namespace GridJob
 		private void DuringScene(SceneView scene)
 		{
 			// If we're editing the grid, make sure gameObject is the active one (ignore clicks on others)
-			if (editMode) { Selection.activeGameObject = gs.gameObject; }
+			if (EditMode) 
+            {
+                //if (!original.Equals(Tile.MaxValue)) 
+                //{
+                //    var world = Graph.TileToWorld(original, gs.Graph.Data);
+                //    var draw = new Vector3(world.x, world.y + gs.Graph.Data.cellSize.y * 0.5f, world.z);
+                //    Gizmos.color = Color.green;
+                //    Gizmos.DrawWireCube(draw, gs.Graph.Data.cellSize * 0.95f);
+                //}
+
+                Selection.activeGameObject = ge.gameObject; 
+            }
 
 			Event e = Event.current;
 
 			// If not in edit mode or no L-click detected, exit.
-			if (!editMode || e.type != EventType.MouseDown || e.button != 0) { return; }
+			if (!EditMode || e.type != EventType.MouseDown || e.button != 0) { return; }
 
 			Vector3 mousePos = e.mousePosition;
 			float ppp = EditorGUIUtility.pixelsPerPoint;
@@ -45,136 +56,95 @@ namespace GridJob
 			mousePos.x *= ppp;
 			Ray ray = scene.camera.ScreenPointToRay(mousePos);
 
-			if (Physics.Raycast(ray, out var hit, 100f, gs.Graph.Data.terrainLayer))
+			if (Physics.Raycast(ray, out var hit, 100f, ge.Graph.Data.AllLayers))
 			{
-				Tile t = gs.Graph.WorldToTile(hit.point);   // Find the tile that was clicked
+				Tile t = ge.Graph.WorldToTile(hit.point);   // Find the tile that was clicked
 
-                if (!t.Equals(Tile.MaxValue) || !gs.Selected.Equals(t)) 
-                {
-                    PrintTile(t);
-                    gs.Selected = t;
-                    gs.SelectedChanged?.Invoke(t);                   
+                if (!t.Equals(Tile.MaxValue) || !original.Equals(t)) 
+                {                   
+                    original = t;
+                    edited = t;
+                    Repaint();
+                    ge.Selected = original;
                 }               
 			}
 
 			e.Use();
 		}
 
-        private void PrintTile(Tile t)
-        {
-            string s = $"Tile {t}, type {t.Type}. Edges: ";
-            Tile[] directions = Tile.Directions_All;
-
-            for (int i = 0; i < directions.Length; i++)
-            {
-                Edge e = Tile.DirectionToEdge(directions[i]);
-
-                if (!t.HasAnyEdge(e)) { continue; }
-
-                s += Enum.GetName(typeof(Edge), e) + ", ";
-            }
-
-            Debug.Log(s);
-        }
         #endregion
 
-        #region Draw Inspector
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
+            GUILayout.Space(10);
+            GUILayout.Label("Asset operations");
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Generate from Data")) 
+            { 
+                ge.AutoSetup();
+                Repaint();
+            }
+
+            if (GUILayout.Button("Save to Asset"))
+            {
+                if ((ge.Asset.Tiles.Length > 0) && EditorUtility.DisplayDialog("Overwrite asset?",
+                    "This will overwrite the Map Asset " + ge.Asset.name +
+                    "This operation can't be undone.", "Overwrite", "Cancel"))
+                {
+                    ge.Save();
+                }
+            }
+
+            if (GUILayout.Button("Load from Asset"))
+            {
+                ge.Load();
+                Repaint();
+            }
+
+            EditorGUILayout.EndHorizontal();
+            GUILayout.Space(10);
+
+            if (GUILayout.Button((EditMode ? "Disable " : "Enable ") + "edit mode")) 
+            { 
+                EditMode = !EditMode;
+                Repaint();
+            }
+
+            if (!EditMode) { return; }
+           
+            GUILayout.Space(10);
+            GUILayout.Label("Tile edit");
+            GUILayout.Label("Selected: " + original);
             
-            if (GUILayout.Button((editMode ? "Disable " : "Enable ") + "edit mode")) { editMode = !editMode; }
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Edges: ");
+            edited.SetEdges((Edge)EditorGUILayout.EnumFlagsField(original.Edges));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Covers: ");
+            edited.SetCovers((Cover)EditorGUILayout.EnumFlagsField(original.Covers));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Types: ");
+            edited.SetType((TileType)EditorGUILayout.EnumFlagsField(original.Type));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Update tile")) 
+            {
+                int i = EditorUtility.DisplayDialogComplex("Update tile", "Updating tile - select destination:",
+                    "Grid only", "Grid and Asset", "Cancel");
+
+                if (i == 0) { ge.UpdateTile(edited, updateAsset: false); }
+                else if (i == 1) { ge.UpdateTile(edited, updateAsset: true); }
+                else { return; }
+            }
+            if(GUILayout.Button("Cancel changes")) { edited = original; }
+            EditorGUILayout.EndHorizontal();
         }
-
-
-        //private void DrawMainButtons()
-        //{
-        //	GUILayout.Space(10);
-        //	GUILayout.Label("Grid creation");
-        //	GUILayout.BeginHorizontal();
-
-        //	if (GUILayout.Button("Create Map")) { GenerateMap(); }
-
-        //	if (GUILayout.Button("Raycast Blocking Layers")) { RaycastBlocks(); }
-
-        //	GUILayout.EndHorizontal();
-        //}
-
-        //private void DrawOperationButtons()
-        //{
-        //	GUILayout.Space(10);
-        //	GUILayout.Label("MapData operations");
-        //	GUILayout.BeginHorizontal();
-
-        //	if (GUILayout.Button("Save MapData"))
-        //	{
-        //		if (!SaveMap(out var s)) { Debug.LogError(s); }
-        //		else { Debug.Log(s); }
-
-        //		EditorUtility.SetDirty(_grid.mapData);
-        //	}
-
-        //	if (GUILayout.Button("Load MapData"))
-        //	{
-        //		if (!LoadMap(out var s)) { Debug.LogError(s); }
-        //		else { Debug.Log(s); }
-        //	}
-
-        //	if (GUILayout.Button("Erase MapData"))
-        //	{
-        //		if (EditorUtility.DisplayDialog("Erase saved MapData?",
-        //			"This will clear all data from the scriptable object attached to this HexGrid."
-        //			+ "This operation can't be undone.", "Erase", "Cancel"))
-        //		{
-        //			if (_grid.mapData == null)
-        //			{
-        //				Debug.LogError("Missing mapData object!");
-        //				return;
-        //			}
-
-        //			_grid.mapData.EraseMapData();
-        //			EditorUtility.SetDirty(_grid.mapData);
-        //		}
-        //	}
-
-        //	EditorGUILayout.EndHorizontal();
-        //}
-
-        //private void DrawEditButtons()
-        //{
-        //	GUILayout.Space(10);
-        //	GUILayout.Label("Map editing modes");
-
-        //	GUILayout.BeginHorizontal();
-        //	var oldColor = GUI.backgroundColor;
-        //	GUI.backgroundColor = Color.red;
-
-        //	if (editMode == HexEditMode.Delete)
-        //	{
-        //		if (GUILayout.Button("Disable Delete mode (Right click to delete Hex)")) { editMode = HexEditMode.None; }
-        //	}
-
-        //	if (editMode == HexEditMode.Edit)
-        //	{
-        //		if (GUILayout.Button("Disable Edit mode (Right click to edit Hex)")) { editMode = HexEditMode.None; }
-        //	}
-
-        //	if (editMode == HexEditMode.Add)
-        //	{
-        //		if (GUILayout.Button("Disable Add mode (Right click to add Hex)")) { editMode = HexEditMode.None; }
-        //	}
-
-        //	GUI.backgroundColor = oldColor;
-
-        //	if (editMode == HexEditMode.None)
-        //	{
-        //		if (GUILayout.Button("Enable Edit mode")) { editMode = HexEditMode.Edit; }
-        //		if (GUILayout.Button("Enable Delete mode")) { editMode = HexEditMode.Delete; }
-        //		if (GUILayout.Button("Enable Add mode")) { editMode = HexEditMode.Add; }
-        //	}
-
-        //	EditorGUILayout.EndHorizontal();
-        //}
-        #endregion
     }
 }

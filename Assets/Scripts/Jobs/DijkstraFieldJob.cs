@@ -13,7 +13,7 @@ namespace GridJob.Jobs
         [ReadOnly]
         private readonly bool includeStart;
         [ReadOnly]
-        private readonly MapData data;
+        private readonly GridData data;
         [ReadOnly]
         private readonly Tile center;
         [ReadOnly]
@@ -38,7 +38,7 @@ namespace GridJob.Jobs
         /// <param name="data">The struct holding information about map size.</param>
         /// <param name="includeStart">Include the center tile in the result list.</param>
         [BurstCompatible]
-        public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+        public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, GridData data,
             int dropDepth = 1, bool log = false, bool includeStart = false)
         {
             this.center = center;
@@ -62,7 +62,7 @@ namespace GridJob.Jobs
             int items = 0;
             for (int i = 0; i < tiles.Length; i++) { costSoFar[i] =  int.MaxValue; }
 
-            Tile begin = tiles[Graph.GetIndex(center, data)];
+            Tile begin = tiles[Grid.GetIndex(center, data)];
             costSoFar[begin.index] = 0;
             frontier.Insert(begin);
             if (includeStart) { result.Add(begin.index); }
@@ -77,7 +77,7 @@ namespace GridJob.Jobs
                 for (int i = 0; i < neighbors.Length; i++)  // Loop through all available neighbors
                 {                         
                     Tile next = neighbors[i];
-                    int costToNext = costSoFar[current.index] + Graph.Cost(next - current, data);
+                    int costToNext = costSoFar[current.index] + Grid.Cost(next - current, data);
                     examined++;
 
                     if (costToNext <= maxCost && !result.Contains(next.index))
@@ -121,9 +121,9 @@ namespace GridJob.Jobs
             {
                 Edge current = (Edge)(1 << i);
 
-                if (tile.HasAnyEdge(current))
+                if (tile.HasPassageTo(current))
                 {
-                    var neighbor = tiles[Graph.GetIndex(tile + directions[i], data.size)];
+                    var neighbor = tiles[Grid.GetIndex(tile + directions[i], data.size)];
 
                     if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
                     else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
@@ -140,7 +140,7 @@ namespace GridJob.Jobs
         {
             for (int i = 0; i < dropDepth; i++)
             {
-                if (Graph.GetIndex(t + Tile.down, data, out int belowIndex))
+                if (Grid.GetIndex(t + Tile.down, data, out int belowIndex))
                 {
                     t = tiles[belowIndex];
 

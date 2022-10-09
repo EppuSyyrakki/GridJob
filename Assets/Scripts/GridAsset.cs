@@ -5,19 +5,16 @@ using UnityEngine;
 namespace GridJob
 {
 	[CreateAssetMenu(fileName = "Map Asset", menuName = "GridJob/New Map Asset", order = 0)]
-	public class MapAsset : ScriptableObject
+	public class GridAsset : ScriptableObject
 	{
 		[SerializeField]
-		bool debugOperations = false;
-
-		[SerializeField]
-		private MapData data;
+		private GridData data;
 
         [SerializeField]
 		private Tile[] tiles;
 
 		public Tile[] Tiles => tiles;
-		public MapData Data => data;
+		public GridData Data => data;
 
 		[ContextMenu("Erase data (Destructive!)")]
 		public void EraseAsset()
@@ -36,7 +33,7 @@ namespace GridJob
 			}
 		}
 
-		public void SaveToAsset(Tile[] tiles, MapData mapData)
+		public void SaveToAsset(Tile[] tiles, GridData mapData)
 		{
 			this.tiles = new Tile[tiles.Length];
 			for (int i = 0; i < tiles.Length; i++) { this.tiles[i] = tiles[i]; }
@@ -45,13 +42,13 @@ namespace GridJob
 			Debug.Log($"Saved {tiles.Length} tiles in {mapData.size.x} * {mapData.size.y} * {mapData.size.z} map to asset: {this}");
 		}
 
-		public MapData LoadFromAsset(out Tile[] tiles)
+		public GridData LoadFromAsset(out Tile[] tiles)
 		{
 			if (this.tiles == null || this.tiles.Length == 0)
 			{
 				tiles = null;
 				Debug.LogError("MapData " + name + " has no stored Map!");
-				return new MapData();
+				return new GridData();
 			}
 
 			tiles = new Tile[this.tiles.Length];
@@ -61,9 +58,11 @@ namespace GridJob
 
 		public bool UpdateTile(Tile tile)
         {
-			if (!Graph.GetIndex(tile, data, out int index)) { return false; }
+			if (!Grid.GetIndex(tile, data, out int index)) { return false; }
 
 			tiles[index] = tile;
+			EditorUtility.SetDirty(this);
+			Debug.Log($"Tile {tile} updated in {name}");
 			return true;
         }
 	}

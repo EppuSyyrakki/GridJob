@@ -15,7 +15,7 @@ namespace GridJob
         [ReadOnly]
         private readonly bool log, draw, includeStart;
         [ReadOnly]
-        private readonly MapData data;
+        private readonly GridData data;
         [ReadOnly]
         private readonly Tile start;
         [ReadOnly]
@@ -41,11 +41,11 @@ namespace GridJob
         /// <param name="log">Log search to console</param>
         /// <param name="draw">Draw debug lines for search visualization</param>
         /// <param name="includeStartInResult">Insert the starting tile in the result list</param>
-        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, MapData data,
+        public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, GridData data,
             int dropDepth = 1, bool log = false, bool draw = false, bool includeStartInResult = false)
         {
-            int startIndex = Graph.GetIndex(start, data);
-            int goalIndex = Graph.GetIndex(goal, data);
+            int startIndex = Grid.GetIndex(start, data);
+            int goalIndex = Grid.GetIndex(goal, data);
             Assert.IsTrue(startIndex != -1 && goalIndex != -1);
             this.data = data;
             this.start = tiles[startIndex];
@@ -103,7 +103,7 @@ namespace GridJob
                 {
                     int neighborIndex = random.NextInt(0, neighbors.Length);
                     Tile next = neighbors[neighborIndex];
-                    int costToNeighbor = Graph.Cost(next - current, data);
+                    int costToNeighbor = Grid.Cost(next - current, data);
                     int newCost = costSoFar[current.index] + costToNeighbor;
                     examined++;
 
@@ -117,7 +117,7 @@ namespace GridJob
 
                     neighbors.RemoveAt(neighborIndex);
 
-                    if (draw) { Debug.DrawLine(Graph.TileToWorld(current, data), Graph.TileToWorld(next, data), Color.red, 10f); }
+                    if (draw) { Debug.DrawLine(Grid.TileToWorld(current, data), Grid.TileToWorld(next, data), Color.red, 10f); }
                     if (log) { msg += $"--{next} cost {costSoFar[next.index]}"; }
                 }
 
@@ -165,9 +165,9 @@ namespace GridJob
             {
                 Edge current = (Edge)(1 << i);
 
-                if (tile.HasAnyEdge(current))
+                if (tile.HasPassageTo(current))
                 {
-                    var neighbor = tiles[Graph.GetIndex(tile + directions[i], data.size)];
+                    var neighbor = tiles[Grid.GetIndex(tile + directions[i], data.size)];
 
                     if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
                     else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
@@ -185,7 +185,7 @@ namespace GridJob
         {
             for (int i = 0; i < dropDepth; i++)
             {
-                if (Graph.GetIndex(t + Tile.down, data, out int belowIndex))
+                if (Grid.GetIndex(t + Tile.down, data, out int belowIndex))
                 {
                     t = tiles[belowIndex];
 

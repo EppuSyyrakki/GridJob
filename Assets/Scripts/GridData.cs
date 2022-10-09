@@ -4,7 +4,7 @@ using UnityEngine;
 namespace GridJob
 {
     [System.Serializable]
-    public struct MapData
+    public struct GridData
     {
         public const int MAX_LENGTH = 65536;
 
@@ -16,7 +16,8 @@ namespace GridJob
         public int maxPathLength;
         [SerializeField]
         public Vector3 cellSize;
-        [SerializeField, Range(0.1f, 0.5f), Tooltip("Size of the Boxcast that tries to detect obstacles inside nodes.")]
+        [SerializeField, Range(0.1f, 0.9f), Tooltip("Size of the Boxcast that tries to detect obstacles inside " 
+            + "nodes, as a fraction of Cell Size")]
         public float obstacleCastRadius;
         [SerializeField]
         public LayerMask coverLayer, terrainLayer, climbLayer, structureLayer;
@@ -26,9 +27,15 @@ namespace GridJob
 
         public int Length => size.x * size.y * size.z;
 
+        public int AllLayers => terrainLayer | structureLayer | coverLayer | climbLayer;
+
         public bool EnsureSize()
         {
-            return size.x > 0 && size.y > 0 && size.z > 0 && Length <= MAX_LENGTH;
+            bool ensured = size.x > 0 && size.y > 0 && size.z > 0 && Length <= MAX_LENGTH;
+#if UNITY_EDITOR
+            if (!ensured) { Debug.LogError("Invalid size in Grid Data!"); }
+#endif
+            return ensured; 
         }
 
         public void SetWorldPosition(Vector3 pos)
@@ -36,7 +43,7 @@ namespace GridJob
             transformPosition = pos;
         }
 
-        public static TileType LayerMapping(int layer, MapData data)
+        public static TileType LayerMapping(int layer, GridData data)
         {
             if ((1 << layer & data.terrainLayer) > 0) { return TileType.Terrain; }
             if ((1 << layer & data.structureLayer) > 0) { return TileType.Structure; }

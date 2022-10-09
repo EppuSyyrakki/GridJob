@@ -16,10 +16,22 @@ namespace GridJob
         SouthEast = 1 << 7,
         SouthWest = 1 << 8,
         NorthWest = 1 << 9,
-        All = North | East | South | West | NorthEast | SouthEast | SouthWest | NorthWest | Up | Down,
+        All = North | East | South | West | Up | Down | NorthEast | SouthEast | SouthWest | NorthWest,
         AllSameLevel = AllDirect | AllDiagonal,       
         AllDirect = North | East | South | West,
         AllDiagonal = NorthEast | SouthEast | SouthWest | NorthWest
+    }
+
+    [Flags]
+    public enum Cover : byte
+    {
+        None = 0,
+        North = 1 << 0,
+        East = 1 << 1,
+        South = 1 << 2,
+        West = 1 << 3,
+        Up = 1 << 4,
+        Down = 1 << 5
     }
 
     [Flags]

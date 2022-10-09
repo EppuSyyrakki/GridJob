@@ -5,7 +5,7 @@ namespace GridJob
 {
     public struct Heuristic : IComparer<Tile>
     {
-        private readonly MapData data;
+        private readonly GridData data;
         private Tile target;
 
         public Tile Target { set { target = value; } }
@@ -14,7 +14,7 @@ namespace GridJob
         /// Creates a comparison struct that is used in PathJob frontier to organize the frontier/open list by their 
         /// manhattan distance to the target node.
         /// </summary>
-        public Heuristic(Tile target, MapData data)
+        public Heuristic(Tile target, GridData data)
         {
             this.target = target;
             this.data = data;
@@ -30,7 +30,7 @@ namespace GridJob
         }
 
         /// <summary> Calculates a height-modded manhattan distance between 2 tiles. </summary>
-        public static int Manhattan(Tile a, Tile b, MapData data)
+        public static int Manhattan(Tile a, Tile b, GridData data)
         {
             sbyte3 dist = a.data - b.data;
             int height = dist.y > 0 ? data.upCost : data.directCost;

@@ -14,18 +14,18 @@ namespace GridJob
         [SerializeField]
         public Edge edges;
         [SerializeField]
-        public Edge covers;
+        public Cover covers;
         [SerializeField]
         public int index;
 
         #region Properties
         public TileType Type => types;
         public Edge Edges => edges;
-        public Edge Covers => covers;
+        public Cover Covers => covers;
         #endregion
 
         #region Constructors
-        public Tile(int x, int y, int z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(int x, int y, int z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
         {
             data = new sbyte3(x, y, z);
             types = type;
@@ -34,7 +34,7 @@ namespace GridJob
             this.index = index;            
         }
 
-        public Tile(Vector3 v, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(Vector3 v, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
         {
             data = new sbyte3((sbyte)math.round(v.x), (sbyte)math.round(v.y), (sbyte)math.round(v.z));
             types = type;
@@ -43,7 +43,7 @@ namespace GridJob
             this.index = index;           
         }
 
-        public Tile(float x, float y, float z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(float x, float y, float z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
         {
             data = new sbyte3((sbyte)math.round(x), (sbyte)math.round(y), (sbyte)math.round(z));
             types = type;
@@ -52,7 +52,7 @@ namespace GridJob
             this.index = index;
         }
 
-        public Tile(sbyte x, sbyte y, sbyte z, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(sbyte x, sbyte y, sbyte z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
         {
             data = new sbyte3(x, y, z);
             types = type;
@@ -61,7 +61,7 @@ namespace GridJob
             this.index = index;
         }
 
-        public Tile(sbyte3 data, Edge edges = (Edge)ushort.MaxValue, Edge covers = (Edge)ushort.MaxValue, TileType type = 0, int index = -1)
+        public Tile(sbyte3 data, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
         {
             this.data = data;
             types = type;
@@ -78,16 +78,19 @@ namespace GridJob
         /// <summary> Returns true if tile has any same flags set as param types. </summary>
         public bool IsAnyType(TileType types) { return (types & this.types) > 0; }
         public void SetEdges(Edge e) { edges = e; }
-        public void SetCovers(Edge c) { covers = c; }
+        public void SetCovers(Cover c) { covers = c; }
         public void AddEdges(Edge e) { edges |= e; }
-        public void AddCovers(Edge c) { covers |= c; }
+        public void AddCovers(Cover c) { covers |= c; }
         public void RemoveEdges(Edge e) { edges &= ~e; }
-        public void RemoveCovers(Edge c) { covers &= ~c; }
+        public void RemoveCovers(Cover c) { covers &= ~c; }
         public void ToggleEdges(Edge e) { edges ^= e; }    
-        public void ToggleCovers(Edge c) { covers ^= c; }
-        public bool HasAnyEdge(Edge e) { return (edges & covers & e) > 0; }
-        public bool HasNoEdge(Edge e) { return (edges & covers & e) == 0 ; }
-        public bool HasEdgeTo(Tile other)
+        public void ToggleCovers(Cover c) { covers ^= c; }
+        public bool HasAnyEdge(Edge e) { return (edges & e) > 0; }
+        public bool HasAnyCover(Cover c) { return (covers & c) > 0; }
+        public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
+        public bool HasNoCover(Cover c) { return (covers & c) == 0; }
+        public bool HasPassageTo(Edge e) { return HasAnyEdge(e) && HasNoCover(e.ToCover()); }
+        public bool HasPassageTo(Tile other)
         {
             Tile dir = this - other;
             sbyte3 abs = dir.data.Abs;
@@ -98,7 +101,7 @@ namespace GridJob
             {
                 Edge current = (Edge)(1 << i);  // edge 1 << 4 is northeast
 
-                if (HasAnyEdge(current) && dir.Equals(Directions_All[i] * -1)) // opposite 4 is sw
+                if (HasPassageTo(current) && dir.Equals(Directions_All[i] * -1)) // opposite 4 is sw
                 {
                     return true;
                 }
@@ -143,6 +146,7 @@ namespace GridJob
         #region Static directions
         public static Tile[] Directions_All => new Tile[] { n, e, s, w, ne, se, sw, nw, up, down };
         public static Tile[] Directions_Direct => new Tile[] { n, e, s, w };
+        public static Tile[] Directions_Cover => new Tile[] { n, e, s, w, up, down };
         public static Tile[] Directions_Diagonal => new Tile[] { ne, se, sw, nw };
         public static Tile[] Directions_Lateral => new Tile[] { n, e, s, w, ne, se, sw, nw };
         public static Tile zero => new Tile(0, 0, 0);

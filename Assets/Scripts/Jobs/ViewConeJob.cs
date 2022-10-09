@@ -11,7 +11,7 @@ namespace GridJob.Jobs
         private const float SQRT2 = 1.41421356f;
 
         [ReadOnly]
-        private readonly MapData data;
+        private readonly GridData data;
         [ReadOnly]
         private readonly Tile center;
         [ReadOnly]
@@ -24,7 +24,7 @@ namespace GridJob.Jobs
         [WriteOnly]
         private NativeList<Tile> result;
 
-        public FovJob(NativeArray<Tile> tiles, MapData data, NativeList<Tile> result, 
+        public FovJob(NativeArray<Tile> tiles, GridData data, NativeList<Tile> result, 
             Tile center, Tile forward, float angleWidth)
         {
             this.data = data;
@@ -54,7 +54,7 @@ namespace GridJob.Jobs
                 float t = dist == 0 ? 0 : (float)step / dist;
                 Tile tile = Lerp(a, b, t);
                 
-                if (!Graph.GetIndex(tile, data, out int index)) { break; }
+                if (!Grid.GetIndex(tile, data, out int index)) { break; }
                 
                 tile = tiles[index];
                     
