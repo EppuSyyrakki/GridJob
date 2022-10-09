@@ -1,30 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using Unity.Mathematics;
-using Unity.VisualScripting;
-using UnityEditor;
-using System;
-
-namespace GridJob
+﻿namespace GridJob
 {
     public static class Extensions
 	{
 		public static bool IsAnyOf(this Edge e, Edge edges)
         {
 			return (e & edges) > 0;
-        }
-
-        public static Cover ToCover(this Edge e)
-        {
-            var result = Cover.None;
-
-            for (int i = 0; i < Enum.GetValues(typeof(Cover)).Length - 1; i++)  // -1 because None doesn't count
-            {
-                if (e.IsAnyOf((Edge)(1 << i))) { result |= (Cover)(1 << i); }
-            }
-
-            return result;
         }
 
         public static (Edge e1, Edge e2) Adjacents(this Edge e)

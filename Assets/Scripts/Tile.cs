@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 
 namespace GridJob
 {
@@ -22,6 +23,7 @@ namespace GridJob
         public TileType Type => types;
         public Edge Edges => edges;
         public Cover Covers => covers;
+        public Tile Normalized => new Tile(data.Normalized, edges, covers, types, index);
         #endregion
 
         #region Constructors
@@ -89,7 +91,7 @@ namespace GridJob
         public bool HasAnyCover(Cover c) { return (covers & c) > 0; }
         public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
         public bool HasNoCover(Cover c) { return (covers & c) == 0; }
-        public bool HasPassageTo(Edge e) { return HasAnyEdge(e) && HasNoCover(e.ToCover()); }
+        public bool HasPassageTo(Edge e) { return HasAnyEdge(e) && HasNoCover((Cover)e); }
         public bool HasPassageTo(Tile other)
         {
             Tile dir = this - other;
@@ -110,12 +112,26 @@ namespace GridJob
             return false;
         }
 
-        public Tile Normalized() { return new Tile(data.Normalized, edges, covers, types, index); }       
+        /// <summary>
+        /// Convenience method that calculates if this tile is at the grid's edge.
+        /// </summary>
+        /// <returns>True if tile + dir would be outside the grid</returns>
+        public bool IsAtLimit(Tile dir, byte3 size)
+        {
+            return (dir.Equals(down) && data.y == 0)
+                    || (dir.Equals(up) && data.y == size.y - 1)
+                    || (dir.Equals(n) && data.z == size.z - 1)
+                    || (dir.Equals(e) && data.x == size.x - 1)
+                    || (dir.Equals(s) && data.z == 0)
+                    || (dir.Equals(w) && data.x == 0);
+        }                     
+
         public float Magnitude() 
         {
             var d = data.Abs;
             return math.sqrt(math.pow(d.x, 2) + math.pow(d.y, 2) + math.pow(d.z, 2));
         }
+
         public static Tile EdgeToDirection(Edge e)
         {
             var directions = Directions_All;
@@ -128,9 +144,10 @@ namespace GridJob
 
             return zero;
         }
+
         public static Edge DirectionToEdge(Tile tile)
         {
-            Tile n = tile.Normalized();
+            Tile n = tile.Normalized;
             var directions = Directions_All;
 
             for (int i = 0; i < directions.Length; i++)
@@ -141,12 +158,27 @@ namespace GridJob
 
             return Edge.None;
         }
+
+        public static (Tile t1, Tile t2) Adjacents(Tile dir)
+        {
+            dir = dir.Normalized;
+            if (dir.Equals(n)) { return (ne, nw); }
+            if (dir.Equals(ne)) { return (n, e); }
+            if (dir.Equals(e)) { return (ne, se); }
+            if (dir.Equals(se)) { return (s, e); }
+            if (dir.Equals(s)) { return (se, sw); }
+            if (dir.Equals(sw)) { return (s, w); }
+            if (dir.Equals(w)) { return (sw, nw); }
+            if (dir.Equals(nw)) { return (n, w); }
+            return (MaxValue, MaxValue);
+        }
         #endregion
 
         #region Static directions
-        public static Tile[] Directions_All => new Tile[] { n, e, s, w, ne, se, sw, nw, up, down };
-        public static Tile[] Directions_Direct => new Tile[] { n, e, s, w };
-        public static Tile[] Directions_Cover => new Tile[] { n, e, s, w, up, down };
+        // All and Cubic must be in the same order so casting from Edge to Cover in a loop works correctly
+        public static Tile[] Directions_All => new Tile[] { n, e, s, w, up, down, ne, se, sw, nw, };
+        public static Tile[] Directions_Cubic => new Tile[] { n, e, s, w, up, down };   
+        public static Tile[] Directions_Direct => new Tile[] { n, e, s, w };        
         public static Tile[] Directions_Diagonal => new Tile[] { ne, se, sw, nw };
         public static Tile[] Directions_Lateral => new Tile[] { n, e, s, w, ne, se, sw, nw };
         public static Tile zero => new Tile(0, 0, 0);
@@ -208,23 +240,4 @@ namespace GridJob
         }
         #endregion
     }
-
-    /// <summary>
-    /// Helper struct to be able to use Unity.Mathematics lerp functions when getting lines of tiles.
-    /// </summary>
-    //public struct FractionTile
-    //{
-    //    public float3 data;
-
-    //    public FractionTile(float3 data) { this.data = data; }
-
-    //    public FractionTile(float x, float y, float z) { data = new float3(x, y, z); }
-
-    //    public FractionTile(Vector3 v) { data = new float3(v); }
-
-    //    public static implicit operator Tile(FractionTile ft)
-    //    { 
-    //        return new Tile((int)ft.data.x, (int)ft.data.y, (int)ft.data.z);
-    //    }
-    //}
 }

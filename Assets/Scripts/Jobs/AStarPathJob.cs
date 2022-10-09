@@ -52,7 +52,7 @@ namespace GridJob
             this.goal = tiles[goalIndex];
             this.tiles = tiles;
             this.result = result;
-            frontierSize = data.size.x * data.size.y * data.size.z / 32;
+            frontierSize = math.max(data.size.x, math.max((int)data.size.y, data.size.z)) * 6;
             this.dropDepth = dropDepth;
             this.log = log;
             this.draw = draw;

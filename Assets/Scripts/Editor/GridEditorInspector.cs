@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEngine;
 
 namespace GridJob
-{
+{   
     [CustomEditor(typeof(GridEditor))]
     public class GridEditorInspector : Editor
     {	
@@ -12,13 +12,13 @@ namespace GridJob
         private Tile edited = Tile.MaxValue;
         private bool EditMode = false;
 
-		#region Unity messages and delegates
+        #region Unity messages and delegates
 
 		private void OnEnable()
 		{
 			SceneView.duringSceneGui += DuringScene;
 			ge = target as GridEditor;
-            if (!ge.Graph.IsInitialized) { ge.LoadGraph(); }
+            ge.TryLoad();
         }
 
 		private void OnDisable()
@@ -56,9 +56,9 @@ namespace GridJob
 			mousePos.x *= ppp;
 			Ray ray = scene.camera.ScreenPointToRay(mousePos);
 
-			if (Physics.Raycast(ray, out var hit, 100f, ge.Graph.Data.AllLayers))
+			if (Physics.Raycast(ray, out var hit, 100f, ge.Grid.Data.AllLayers))
 			{
-				Tile t = ge.Graph.WorldToTile(hit.point);   // Find the tile that was clicked
+				Tile t = ge.Grid.WorldToTile(hit.point);   // Find the tile that was clicked
 
                 if (!t.Equals(Tile.MaxValue) || !original.Equals(t)) 
                 {                   
@@ -82,10 +82,21 @@ namespace GridJob
             GUILayout.BeginHorizontal();
 
             if (GUILayout.Button("Generate from Data")) 
-            { 
-                ge.AutoSetup();
+            {
+                double startTime = Time.realtimeSinceStartupAsDouble;
+                ge.CreateFromData();
+                Repaint();
+                Debug.Log("Operation time: " + (Time.realtimeSinceStartup - startTime) + " seconds");
+            }
+
+            if (GUILayout.Button("Rebuild from existing data"))
+            {
+                ge.RebuildExisting();
                 Repaint();
             }
+
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
 
             if (GUILayout.Button("Save to Asset"))
             {
@@ -94,12 +105,13 @@ namespace GridJob
                     "This operation can't be undone.", "Overwrite", "Cancel"))
                 {
                     ge.Save();
+                    Repaint();
                 }
             }
 
             if (GUILayout.Button("Load from Asset"))
             {
-                ge.Load();
+                ge.ForceLoad();
                 Repaint();
             }
 
@@ -109,14 +121,27 @@ namespace GridJob
             if (GUILayout.Button((EditMode ? "Disable " : "Enable ") + "edit mode")) 
             { 
                 EditMode = !EditMode;
-                Repaint();
+                ge.Selected = EditMode ? original : Tile.MaxValue;
+                SceneView.RepaintAll();
             }
 
             if (!EditMode) { return; }
            
             GUILayout.Space(10);
-            GUILayout.Label("Tile edit");
-            GUILayout.Label("Selected: " + original);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Selected Tile: " + original);
+            if (GUILayout.Button("Select tile above current"))
+            {
+                Tile newTile = new Tile(original.data.x, original.data.y + 1, original.data.z);
+                
+                if (Grid.GetIndex(newTile, ge.Grid.Data, out int index))
+                {
+                    ge.Selected = ge.Grid.Tiles[index];
+                    original = ge.Selected;
+                    SceneView.RepaintAll();
+                }               
+            }
+            EditorGUILayout.EndHorizontal();
             
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label("Edges: ");

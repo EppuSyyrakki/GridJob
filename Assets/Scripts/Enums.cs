@@ -39,7 +39,7 @@ namespace GridJob
     {
         None = 0,
         All = Empty | Terrain | Cover | Structure | Climb | Jump | Occupied,
-        WalkableTypes = Climb | Empty | Jump,
+        MovableTypes = Climb | Empty | Jump,
         BlockedTypes = Terrain | Cover | Structure | Occupied,
         Empty = 1 << 0,
         Terrain = 1 << 1,   // Has no edges to any direction (these should be true from Graph.AutoBuild())

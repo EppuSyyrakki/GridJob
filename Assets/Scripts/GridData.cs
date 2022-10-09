@@ -51,5 +51,10 @@ namespace GridJob
             if ((1 << layer & data.climbLayer) > 0) { return TileType.Climb; }
             return TileType.Empty;
         }
+
+        public static bool EnsureSize(int length)
+        {
+            return length <= MAX_LENGTH;
+        }
     }	
 }
