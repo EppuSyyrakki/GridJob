@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace GridJob
+namespace GridSystem
 {   
     [CustomEditor(typeof(GridEditor))]
     public class GridEditorInspector : Editor
@@ -56,9 +56,9 @@ namespace GridJob
 			mousePos.x *= ppp;
 			Ray ray = scene.camera.ScreenPointToRay(mousePos);
 
-			if (Physics.Raycast(ray, out var hit, 100f, ge.Grid.Data.AllLayers))
+			if (Physics.Raycast(ray, out var hit, 100f, ge.GridMap.Data.AllLayers))
 			{
-				Tile t = ge.Grid.WorldToTile(hit.point);   // Find the tile that was clicked
+				Tile t = ge.GridMap.WorldToTile(hit.point);   // Find the tile that was clicked
 
                 if (!t.Equals(Tile.MaxValue) || !original.Equals(t)) 
                 {                   
@@ -134,9 +134,9 @@ namespace GridJob
             {
                 Tile newTile = new Tile(original.data.x, original.data.y + 1, original.data.z);
                 
-                if (Grid.GetIndex(newTile, ge.Grid.Data, out int index))
+                if (Grid.GetIndex(newTile, ge.GridMap.Data, out int index))
                 {
-                    ge.Selected = ge.Grid.Tiles[index];
+                    ge.Selected = ge.GridMap.Tiles[index];
                     original = ge.Selected;
                     SceneView.RepaintAll();
                 }               

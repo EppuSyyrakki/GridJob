@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
-using Unity.VisualScripting;
-using System.Linq;
 
-namespace GridJob
+namespace GridSystem
 {
 	public struct Grid
 	{
@@ -235,8 +233,7 @@ namespace GridJob
 		public static bool GetIndex(Tile t, GridData data, out int index)
         {
 			index = GetIndex(t, data);
-			if (index == -1) { return false; }
-			return true;
+			return index != -1;
         }
 
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
@@ -268,15 +265,6 @@ namespace GridJob
         public static bool HasTile(Tile t, byte3 size) { return HasTile(t.data, size); }
         public static bool HasTile(sbyte3 d, byte3 size) { return GetIndex(d, size) != -1; }
 
-        private static Tile Lerp(in Tile a, in Tile b, in float t)
-        {
-            return new Tile(
-                math.round(Lerp(in a.data.x, in b.data.x, in t)),
-                math.round(Lerp(in a.data.y, in b.data.y, in t)),
-                math.round(Lerp(in a.data.z, in b.data.z, in t))
-                );
-        }
-
 		private static Point Lerp(in Point a, in Point b, in float t)
 		{
 			return new Point(
@@ -304,27 +292,6 @@ namespace GridJob
 			public Point(sbyte q, sbyte r) { this.q = q; this.r = r; }
 			public Point(float q, float r) { this.q = (sbyte)math.round(q); this.r = (sbyte)math.round(r); }
 		}
-
-		//private static float Min(float3 f)
-		//{
-		//	if (f.x < f.y && f.x < f.z) return f.x;
-		//	if (f.y < f.x && f.y < f.z) return f.y;
-		//	return f.z;
-		//}
-
-  //      private static float Mid(float3 f)
-  //      {
-		//	if (f.x < f.y && f.x > f.z) return f.x;
-		//	if (f.y < f.x && f.y > f.z) return f.y;
-		//	return f.z;
-  //      }
-
-  //      private static float Max(float3 f)
-  //      {
-		//	if (f.x > f.y && f.x > f.z) return f.x;
-		//	if (f.y > f.x && f.y > f.z) return f.y;
-		//	return f.z;
-  //      }
 
         #endregion
     }

@@ -1,9 +1,8 @@
 using System;
 using UnityEngine;
 using Unity.Mathematics;
-using Unity.VisualScripting;
 
-namespace GridJob
+namespace GridSystem
 {
     [Serializable]
     public struct Tile : IEquatable<Tile>

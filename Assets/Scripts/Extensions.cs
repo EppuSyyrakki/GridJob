@@ -1,4 +1,4 @@
-﻿namespace GridJob
+﻿namespace GridSystem
 {
     public static class Extensions
 	{

@@ -1,4 +1,4 @@
-﻿using GridJob.Jobs;
+﻿using GridSystem.Jobs;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -8,7 +8,7 @@ using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
 
-namespace GridJob
+namespace GridSystem
 {
     public class GridEditor : MonoBehaviour
     {
@@ -56,7 +56,7 @@ namespace GridJob
         private List<Tile> field;
         private List<Tile> fov;
 
-        public Grid Grid { get; private set; } 
+        public Grid GridMap { get; private set; } 
         public GridAsset Asset => asset;
         public Tile Selected { get; set; }
 
@@ -69,7 +69,7 @@ namespace GridJob
             fov = new List<Tile>();
             player = GameObject.FindGameObjectWithTag("Player");
 
-            if (!Grid.IsInitialized)
+            if (!GridMap.IsInitialized)
             {
                 ForceLoad();
             }
@@ -77,16 +77,16 @@ namespace GridJob
 
         private void OnEnable()
         {          
-            n_tiles = new NativeArray<Tile>(Grid.Tiles.Length, Allocator.Persistent);
+            n_tiles = new NativeArray<Tile>(GridMap.Tiles.Length, Allocator.Persistent);
         }
 
         private void Start()
         {
-            Grid.Data.SetWorldPosition(transform.position);
+            GridMap.Data.SetWorldPosition(transform.position);
 
-            for (int i = 0; i < Grid.Tiles.Length; i++)
+            for (int i = 0; i < GridMap.Tiles.Length; i++)
             {
-                n_tiles[i] = Grid.Tiles[i];
+                n_tiles[i] = GridMap.Tiles[i];
             }
         }
 
@@ -97,9 +97,9 @@ namespace GridJob
 
         private void Update()
         {            
-            Tile playerPos = Grid.WorldToTile(player.transform.position);
+            Tile playerPos = GridMap.WorldToTile(player.transform.position);
 
-            if (Grid.HasTile(playerPos, Grid.Data))
+            if (Grid.HasTile(playerPos, GridMap.Data))
             {
                 start = playerPos;
             }
@@ -110,8 +110,8 @@ namespace GridJob
 
                 if (target.Equals(Tile.MaxValue)) { fov.Clear(); return; }
 
-                fov = Grid.Linecast(start, target, TileType.MovableTypes);
-                Debug.DrawLine(Grid.TileToWorld(start, Grid.Data), Grid.TileToWorld(target, Grid.Data), Color.red, 10f);
+                fov = GridMap.Linecast(start, target, TileType.MovableTypes);
+                Debug.DrawLine(Grid.TileToWorld(start, GridMap.Data), Grid.TileToWorld(target, GridMap.Data), Color.red, 10f);
                 return;
             }
 
@@ -163,7 +163,7 @@ namespace GridJob
         {
             if ((helpers & Helpers.DrawAllTiles) > 0)
             {
-                foreach (Tile t in Grid.Tiles) { WireCube(t, t.Edges == Edge.None ? Color.black : gridColor); }
+                foreach (Tile t in GridMap.Tiles) { WireCube(t, t.Edges == Edge.None ? Color.black : gridColor); }
             }
 
             if ((helpers & Helpers.DrawSelectedTile) > 0)
@@ -180,10 +180,10 @@ namespace GridJob
 
             void WireCube(Tile t, Color c)
             {
-                var world = Grid.TileToWorld(t, Grid.Data);
-                var draw = new Vector3(world.x, world.y + Grid.Data.cellSize.y * 0.5f, world.z);
+                var world = Grid.TileToWorld(t, GridMap.Data);
+                var draw = new Vector3(world.x, world.y + GridMap.Data.cellSize.y * 0.5f, world.z);
                 Gizmos.color = c;
-                Gizmos.DrawWireCube(draw, Grid.Data.cellSize * 0.98f);
+                Gizmos.DrawWireCube(draw, GridMap.Data.cellSize * 0.98f);
             }
         }
 
@@ -195,7 +195,7 @@ namespace GridJob
             foreach (var tile in tiles)
             {
                 Gizmos.color = color;
-                Gizmos.DrawSphere(Grid.TileToWorld(tile, Grid.Data), Grid.Data.cellSize.x * 0.15f);
+                Gizmos.DrawSphere(Grid.TileToWorld(tile, GridMap.Data), GridMap.Data.cellSize.x * 0.15f);
             }
         }
 
@@ -205,9 +205,9 @@ namespace GridJob
 
         private bool SchedulePathJob(Tile start, Tile goal, int dropDepth = 1)
         {
-            var mDist = Heuristic.Manhattan(goal, start, Grid.Data);
-            int largest = math.max(Grid.Data.size.x, math.max((int)Grid.Data.size.y, Grid.Data.size.z));
-            var maxDistance = largest * 2 * Grid.Data.diagonalCost;
+            var mDist = Heuristic.Manhattan(goal, start, GridMap.Data);
+            int largest = math.max(GridMap.Data.size.x, math.max((int)GridMap.Data.size.y, GridMap.Data.size.z));
+            var maxDistance = largest * 2 * GridMap.Data.diagonalCost;
             bool log = (helpers & Helpers.LogPathfinder) > 0;
             bool draw = (helpers & Helpers.DrawPathfinder) > 0;
 
@@ -217,11 +217,11 @@ namespace GridJob
                     + $" Manhattan {mDist}, maxDist: {maxDistance}");
             }
 
-            if (!Grid.HasTile(start, Grid.Data) || !Grid.HasTile(goal, Grid.Data) || mDist > maxDistance) { return false; }
+            if (!Grid.HasTile(start, GridMap.Data) || !Grid.HasTile(goal, GridMap.Data) || mDist > maxDistance) { return false; }
 
-            n_pathResult = new NativeList<Tile>(Grid.Data.maxPathLength, Allocator.TempJob);
+            n_pathResult = new NativeList<Tile>(GridMap.Data.maxPathLength, Allocator.TempJob);
             this.start = start;           
-            var job = new AStarPathJob(start, goal, n_tiles, n_pathResult, Grid.Data, dropDepth, log, draw);
+            var job = new AStarPathJob(start, goal, n_tiles, n_pathResult, GridMap.Data, dropDepth);
             pathHandle = job.Schedule();
             return true;
         }
@@ -233,15 +233,15 @@ namespace GridJob
             if (log)
             {
                 Debug.Log($"Attempting to schedule distance field job: From {center}, Dist: {fieldRange}" 
-                    + $", MaxCost: {fieldRange * Grid.Data.directCost}");
+                    + $", MaxCost: {fieldRange * GridMap.Data.directCost}");
             }
 
-            if (!Grid.HasTile(center, Grid.Data) 
-                || fieldRange > Mathf.Max(Grid.Data.size.x, Grid.Data.size.z)) { return false; }
+            if (!Grid.HasTile(center, GridMap.Data) 
+                || fieldRange > Mathf.Max(GridMap.Data.size.x, GridMap.Data.size.z)) { return false; }
 
             n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
             start = center;        
-            var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, Grid.Data, dropDepth, log, false);
+            var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, GridMap.Data, dropDepth, false);
             fieldHandle = job.Schedule();
 
             return true;
@@ -249,11 +249,11 @@ namespace GridJob
 
         private bool ScheduleFovJob(Tile center, Tile forward, float angleWidth)
         {
-            if (!Grid.HasTile(center, Grid.Data)) { return false; }
+            if (!Grid.HasTile(center, GridMap.Data)) { return false; }
 
             n_fovResult = new NativeList<Tile>(Allocator.TempJob);
             start = center;
-            var job = new FovJob(n_tiles, Grid.Data, n_fovResult, start, forward, angleWidth);
+            var job = new FovJob(n_tiles, GridMap.Data, n_fovResult, start, forward, angleWidth);
             fovHandle = job.Schedule();
 
             return true;
@@ -277,7 +277,7 @@ namespace GridJob
             Ray r = Camera.main.ScreenPointToRay(mouse);
             if (Physics.Raycast(r, out var hit))
             {
-                return Grid.WorldToTile(hit.point);
+                return GridMap.WorldToTile(hit.point);
             }
 
             return Tile.MaxValue;
@@ -289,7 +289,7 @@ namespace GridJob
             else if (!asset.HasData) { Debug.LogError(this + ": Trying to load from empty Map Asset!"); return; }
             else if (!asset.Data.EnsureSize()) { Debug.LogError(this + ": Map Asset too large!."); }
             
-            Grid = new Grid(asset, log);
+            GridMap = new Grid(asset, log);
         }
 
         #region Grid building
@@ -548,43 +548,43 @@ namespace GridJob
                 else { Debug.LogError($"Could not update tile {t} - Not found in Asset {asset.name}"); }                              
             }
 
-            if (Grid.UpdateTile(t)) { Debug.Log($"Updated Grid with Tile {t}"); }
+            if (GridMap.UpdateTile(t)) { Debug.Log($"Updated Grid with Tile {t}"); }
             else  { Debug.LogError($"Could not update tile {t} in runtime graph - Tile not found"); }
         }
 
         [ContextMenu("Auto setup from unstored data", false, 0)]
         public void CreateFromData()
         {
-            Grid = new Grid(Data, true);
-            Grid.SetTiles(AutoBuild(Grid.Tiles, Data));     
+            GridMap = new Grid(Data, true);
+            GridMap.SetTiles(AutoBuild(GridMap.Tiles, Data));     
         }
 
         [ContextMenu("Auto setup from existing data", false, 1)]
         public void RebuildExisting()
         {
-            Grid = new Grid(Grid.Data, true);
-            Grid.SetTiles(AutoBuild(Grid.Tiles, Data));
+            GridMap = new Grid(GridMap.Data, true);
+            GridMap.SetTiles(AutoBuild(GridMap.Tiles, Data));
         }
 
         [ContextMenu("Save graph to asset", false, 2)]
         public void Save()
         {
-            asset.SaveToAsset(Grid.Tiles, Grid.Data);
+            asset.SaveToAsset(GridMap.Tiles, GridMap.Data);
         }
 
         [ContextMenu("Force Load graph from asset", false, 3)]
         public void ForceLoad()
         {           
             LoadGraph(log: true);
-            Data = Grid.Data;
+            Data = GridMap.Data;
         }
 
         public void TryLoad()
         {
-            if (Grid.IsInitialized) { return; }
+            if (GridMap.IsInitialized) { return; }
 
             LoadGraph(log: true);
-            Data = Grid.Data;
+            Data = GridMap.Data;
         }
         #endregion
     }

@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace GridJob
+namespace GridSystem
 {
 	[CreateAssetMenu(fileName = "Map Asset", menuName = "GridJob/New Map Asset", order = 0)]
 	public class GridAsset : ScriptableObject

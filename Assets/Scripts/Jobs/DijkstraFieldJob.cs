@@ -1,15 +1,11 @@
-﻿using System.Collections;
-using UnityEngine;
-using Unity.Jobs;
+﻿using Unity.Jobs;
 using Unity.Collections;
 
-namespace GridJob.Jobs
+namespace GridSystem.Jobs
 {
     [BurstCompatible]
     public struct DijkstraFieldJob : IJob
     {
-        [ReadOnly]
-        private readonly bool log;
         [ReadOnly]
         private readonly bool includeStart;
         [ReadOnly]
@@ -39,14 +35,13 @@ namespace GridJob.Jobs
         /// <param name="includeStart">Include the center tile in the result list.</param>
         [BurstCompatible]
         public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, GridData data,
-            int dropDepth = 1, bool log = false, bool includeStart = false)
+            int dropDepth = 1, bool includeStart = false)
         {
             this.center = center;
             maxCost = range * data.directCost;
             this.data = data;
             this.tiles = tiles;
             this.dropDepth = dropDepth;
-            this.log = log;
             this.includeStart = includeStart;
             this.result = result;
             comparer = new Heuristic(center, data);
@@ -69,10 +64,8 @@ namespace GridJob.Jobs
 
             while (frontier.Count > 0)
             {
-                string msg = "";
                 var current = frontier.Pop();
                 NativeList<Tile> neighbors = GetNeighbors(current);
-                if (log) { msg += ("DFJ Examining: " + current + " with " + neighbors.Length + " neighbors: "); }
 
                 for (int i = 0; i < neighbors.Length; i++)  // Loop through all available neighbors
                 {                         
@@ -87,12 +80,9 @@ namespace GridJob.Jobs
                         frontier.Insert(in next);
                         costSoFar[next.index] = costToNext;
                     }
-
-                    if (log) { msg += $"--{next} cost {costSoFar[next.index]}/{maxCost}"; }
                 }
 
                 neighbors.Dispose();
-                if (log) { Debug.Log(msg); }
             }
 
             for (int i = 0; i < result.Length; i++)
@@ -100,8 +90,6 @@ namespace GridJob.Jobs
                 int index = result[i];
                 this.result.Add(tiles[index]);
             }
-            
-            if (log) { Debug.Log($"{items} tiles added to results. Examined {examined} tiles in total."); }
         }
 
         /// <summary>
@@ -136,6 +124,7 @@ namespace GridJob.Jobs
             return neighbors;
         }
 
+        [BurstCompatible]
         private bool CanDrop(Tile t)
         {
             for (int i = 0; i < dropDepth; i++)

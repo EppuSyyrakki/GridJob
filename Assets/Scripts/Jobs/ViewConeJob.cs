@@ -2,7 +2,7 @@
 using Unity.Jobs;
 using Unity.Mathematics;
 
-namespace GridJob.Jobs
+namespace GridSystem.Jobs
 {
     [BurstCompatible]
     public struct FovJob : IJob

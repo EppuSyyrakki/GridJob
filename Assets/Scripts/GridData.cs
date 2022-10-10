@@ -1,7 +1,7 @@
 ﻿using Unity.Mathematics;
 using UnityEngine;
 
-namespace GridJob
+namespace GridSystem
 {
     [System.Serializable]
     public struct GridData

@@ -1,19 +1,14 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using Unity.Collections;
+﻿using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
-using UnityEngine.Assertions;
-using Random = Unity.Mathematics.Random;
 
-namespace GridJob
+namespace GridSystem
 {
     [BurstCompatible]
     struct AStarPathJob : IJob
     {
         [ReadOnly]
-        private readonly bool log, draw, includeStart;
+        private readonly bool includeStart;
         [ReadOnly]
         private readonly GridData data;
         [ReadOnly]
@@ -42,11 +37,10 @@ namespace GridJob
         /// <param name="draw">Draw debug lines for search visualization</param>
         /// <param name="includeStartInResult">Insert the starting tile in the result list</param>
         public AStarPathJob(Tile start, Tile goal, NativeArray<Tile> tiles, NativeList<Tile> result, GridData data,
-            int dropDepth = 1, bool log = false, bool draw = false, bool includeStartInResult = false)
+            int dropDepth = 1, bool includeStartInResult = false)
         {
             int startIndex = Grid.GetIndex(start, data);
             int goalIndex = Grid.GetIndex(goal, data);
-            Assert.IsTrue(startIndex != -1 && goalIndex != -1);
             this.data = data;
             this.start = tiles[startIndex];
             this.goal = tiles[goalIndex];
@@ -54,8 +48,6 @@ namespace GridJob
             this.result = result;
             frontierSize = math.max(data.size.x, math.max((int)data.size.y, data.size.z)) * 6;
             this.dropDepth = dropDepth;
-            this.log = log;
-            this.draw = draw;
             includeStart = includeStartInResult;            
         }
 
@@ -81,23 +73,10 @@ namespace GridJob
             while (frontier.Count > 0)  // Still have nodes to search.
             {
                 current = frontier.Pop();
-                string msg = "";
 
-                if (frontier.Count >= frontierSize)
-                {
-                    if (log) { Debug.Log($"Max frontier size of {frontierSize} reached. Exiting search."); }
-                    break;
-                }
-
-                // Early exit, goal found or max frontier reached
-                if (current.Equals(goal)) 
-                { 
-                    if (log) { Debug.Log("Goal found."); } 
-                    break; 
-                } 
+                if (current.Equals(goal) || frontier.Count >= frontierSize) { break; } // Early exit - frontier full or goal reached
 
                 NativeList<Tile> neighbors = GetNeighbors(current); // Filter available neighbors               
-                if (log) { msg += ("----Examining: " + current + " with " + neighbors.Length + " neighbors: "); }
 
                 while (neighbors.Length > 0)  // Loop through all available neighbors
                 {
@@ -116,32 +95,21 @@ namespace GridJob
                     }
 
                     neighbors.RemoveAt(neighborIndex);
-
-                    if (draw) { Debug.DrawLine(Grid.TileToWorld(current, data), Grid.TileToWorld(next, data), Color.red, 10f); }
-                    if (log) { msg += $"--{next} cost {costSoFar[next.index]}"; }
                 }
 
-
-                if (log) { Debug.Log(msg + $". Frontier: {frontier.Count}/{frontierSize}"); msg = ""; }
                 neighbors.Dispose();
             }
-
-            int items = 0;
 
             while (!current.Equals(start))
             {
                 result.Add(tiles[current.index]);
                 current = tiles[cameFrom[current.index]];
-                items++;
             }
 
             if (includeStart)
             {
                 result.Add(start);
-                items++;
             }
-
-            if (log) { Debug.Log($"{items} tiles added to results. Examined {examined} tiles in total."); }
             
             frontier.Dispose();
             costSoFar.Dispose();
