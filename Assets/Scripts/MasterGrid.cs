@@ -67,7 +67,7 @@ namespace GridSystem
             }
         }
 
-        private JobHandle SchedulePathJob(Tile start, Tile goal, ref NativeList<Tile> result, int dropDepth = 1)
+        private JobHandle SchedulePathJob(Tile start, Tile goal, ref NativeList<Tile> result, int dropDepth)
         {
             if (!Grid.HasTile(start, grid.Data)) 
             {               
@@ -83,7 +83,7 @@ namespace GridSystem
             return job.Schedule();
         }
 
-        private JobHandle ScheduleFieldJob(Tile center, int fieldRange, ref NativeList<Tile> result, int dropDepth = 1)
+        private JobHandle ScheduleFieldJob(Tile center, int fieldRange, ref NativeList<Tile> result, int dropDepth)
         {
             if (!Grid.HasTile(center, grid.Data)) 
             {
@@ -93,7 +93,12 @@ namespace GridSystem
             result = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
             var job = new DijkstraFieldJob(center, fieldRange, n_tiles, result, grid.Data, dropDepth);
             return job.Schedule();
-        }        
+        }
+        
+        public void UpdateGrid()
+        {
+
+        }
 
         public void ScheduleJobs()
         {

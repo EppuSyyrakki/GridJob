@@ -1,12 +1,16 @@
 using System;
 using UnityEngine;
 using Unity.Mathematics;
+using Unity.Collections;
+using Unity.VisualScripting;
 
 namespace GridSystem
 {
     [Serializable]
     public struct Tile : IEquatable<Tile>
     {
+        private const float DEG_TO_RAD = math.PI / 180;
+
         [SerializeField]
         public sbyte3 data;
         [SerializeField]
@@ -23,6 +27,16 @@ namespace GridSystem
         public Edge Edges => edges;
         public Cover Covers => covers;
         public Tile Normalized => new Tile(data.Normalized, edges, covers, types, index);
+        
+        [BurstCompatible]
+        public float Magnitude
+        {
+            get
+            {
+                var d = data.Abs;
+                return math.sqrt(math.pow(d.x, 2) + math.pow(d.y, 2) + math.pow(d.z, 2));
+            }
+        }
         #endregion
 
         #region Constructors
@@ -72,7 +86,22 @@ namespace GridSystem
         }
         #endregion
 
-        #region Tile, Type and Edge operations        
+        #region Tile, Type and Edge operations
+        /// <summary>
+        /// Rotates a tile vector in 2D. Positive degrees rotate counter-clockwise.
+        /// </summary>
+        [BurstCompatible]
+        public Tile Rotate(float degrees)
+        {
+            degrees = degrees % 360;
+            if (degrees < 0) { degrees += 360;}
+            float rad = degrees * DEG_TO_RAD;
+            float cos = math.cos(rad), sin = math.sin(rad);
+            return new Tile(
+                (int)math.round(cos * data.x - sin * data.z), 
+                data.y, 
+                (int)math.round(sin * data.x + cos * data.z));
+        }
         public void SetType(TileType t) { types = t; }
         public void AddType(TileType t) { types |= t; }
         public void RemoveType(TileType t) { types &= ~t; }
@@ -124,12 +153,6 @@ namespace GridSystem
                     || (dir.Equals(s) && data.z == 0)
                     || (dir.Equals(w) && data.x == 0);
         }                     
-
-        public float Magnitude() 
-        {
-            var d = data.Abs;
-            return math.sqrt(math.pow(d.x, 2) + math.pow(d.y, 2) + math.pow(d.z, 2));
-        }
 
         public static Tile EdgeToDirection(Edge e)
         {
@@ -221,6 +244,11 @@ namespace GridSystem
         public static Tile operator +(Tile a, Edge e)
         {
             return a + EdgeToDirection(e);
+        }
+
+        public static implicit operator Vector3(Tile t)
+        {
+            return new Vector3(t.data.x, t.data.y, t.data.z);
         }
 
         public override int GetHashCode() 

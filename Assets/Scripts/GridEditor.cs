@@ -1,18 +1,17 @@
 ﻿using GridSystem.Jobs;
-using System;
+using System.Collections;
+// using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace GridSystem
 {
     public class GridEditor : MonoBehaviour
     {
-        [Flags]
+        [System.Flags]
         public enum Helpers : byte
         { 
             None = 0, 
@@ -44,7 +43,7 @@ namespace GridSystem
         private JobHandle fovHandle;
         private NativeList<Tile> n_pathResult;  // Allocator.TempJob
         private NativeList<Tile> n_fieldResult;   // Allocator.TempJob
-        private NativeList<Tile> n_fovResult;   // Allocator.TempJob
+        private NativeHashSet<Tile> n_fovResult;   // Allocator.TempJob
         private NativeArray<Tile> n_tiles;  // Allocator.Persistent
 
         private JobType scheduled = JobType.None;
@@ -69,10 +68,7 @@ namespace GridSystem
             fov = new List<Tile>();
             player = GameObject.FindGameObjectWithTag("Player");
 
-            if (!GridMap.IsInitialized)
-            {
-                ForceLoad();
-            }
+            if (!GridMap.IsInitialized) { ForceLoad(); }
         }
 
         private void OnEnable()
@@ -131,12 +127,66 @@ namespace GridSystem
                 {
                     scheduled = JobType.Path;
                 }
-                else if (jobType == JobType.Fov 
-                    && ScheduleFovJob(start, target - start, 80f))
+                //else if (jobType == JobType.Fov)
+                //{
+                //    StartCoroutine(DrawFov(start, target - start, 60f));
+                //}
+                else if (jobType == JobType.Fov
+                    && ScheduleFovJob(start, target - start, 60f))
                 {
                     scheduled = JobType.Fov;
                 }
             }
+        }
+
+        /// <summary> Debugging method to test the Fov mechanic </summary>
+        private IEnumerator DrawFov(Tile center, Tile forward, float angle)
+        {
+            fov.Clear();
+            Tile right = forward.Rotate(-angle * 0.5f);
+            Tile current = right;
+            var line = new List<Tile>(GridMap.Linecast(center, center + current));
+            yield return AddToResult(line);
+
+            for (float rotation = 1; rotation < angle; rotation++)
+            {
+                Debug.Log(rotation);
+                Tile next = right.Rotate(rotation);
+
+                if (next.Equals(current)) 
+                {
+                    Debug.DrawLine(Grid.TileToWorld(center, Data), Grid.TileToWorld(center + next, Data), Color.magenta, 20f);
+                    continue;  // rotation wasn't enough to get a new end tile
+                }
+
+                line.Clear();
+                line.AddRange(GridMap.Linecast(center, center + next));
+                yield return AddToResult(line);
+                current = next;
+            }
+
+            IEnumerator AddToResult(List<Tile> line)
+            {
+                for (int i = line.Count - 1; i >= 0; i--)
+                {
+                    if (!fov.Contains(line[i]))
+                    {
+                        fov.Add(line[i]);
+                        DrawSingle(line[i], Color.green);
+                        yield return new WaitForSeconds(0.1f);
+                    }
+                    else
+                    {
+                        DrawSingle(line[i], Color.red);
+                        yield return new WaitForSeconds(0.1f);
+                    }
+                }
+            }
+
+            void DrawSingle(Tile t, Color c)
+            {
+                Debug.DrawRay(Grid.TileToWorld(t, Data) + Vector3.one * UnityEngine.Random.Range(0.01f, 0.1f), Vector3.up, c, 20f);
+            }  
         }
 
         private void LateUpdate()
@@ -209,15 +259,10 @@ namespace GridSystem
             int largest = math.max(GridMap.Data.size.x, math.max((int)GridMap.Data.size.y, GridMap.Data.size.z));
             var maxDistance = largest * 2 * GridMap.Data.diagonalCost;
             bool log = (helpers & Helpers.LogPathfinder) > 0;
-            bool draw = (helpers & Helpers.DrawPathfinder) > 0;
 
-            if (log)
-            {
-                Debug.Log($"Attempting to Schedule Path Job: From {start} To {goal}, " 
-                    + $" Manhattan {mDist}, maxDist: {maxDistance}");
-            }
+            if (log) { Debug.Log($"Attempting to Schedule Path Job: From {start} To {goal}"); }
 
-            if (!Grid.HasTile(start, GridMap.Data) || !Grid.HasTile(goal, GridMap.Data) || mDist > maxDistance) { return false; }
+            if (!Grid.HasTile(start, GridMap.Data) || !Grid.HasTile(goal, GridMap.Data)) { return false; }
 
             n_pathResult = new NativeList<Tile>(GridMap.Data.maxPathLength, Allocator.TempJob);
             this.start = start;           
@@ -230,11 +275,7 @@ namespace GridSystem
         {
             bool log = (helpers & Helpers.LogPathfinder) > 0;
 
-            if (log)
-            {
-                Debug.Log($"Attempting to schedule distance field job: From {center}, Dist: {fieldRange}" 
-                    + $", MaxCost: {fieldRange * GridMap.Data.directCost}");
-            }
+            if (log) { Debug.Log($"Attempting to schedule distance field job: From {center}, Dist: {fieldRange}"); }
 
             if (!Grid.HasTile(center, GridMap.Data) 
                 || fieldRange > Mathf.Max(GridMap.Data.size.x, GridMap.Data.size.z)) { return false; }
@@ -251,7 +292,8 @@ namespace GridSystem
         {
             if (!Grid.HasTile(center, GridMap.Data)) { return false; }
 
-            n_fovResult = new NativeList<Tile>(Allocator.TempJob);
+            int cap = (int)forward.Magnitude * (int)(angleWidth / 2);
+            n_fovResult = new NativeHashSet<Tile>(cap, Allocator.TempJob);
             start = center;
             var job = new FovJob(n_tiles, GridMap.Data, n_fovResult, start, forward, angleWidth);
             fovHandle = job.Schedule();
@@ -259,13 +301,19 @@ namespace GridSystem
             return true;
         }
 
-        private void CompleteAndDispose(ref JobHandle handle, ref NativeList<Tile> from, List<Tile> to)
+        private void CompleteAndDispose(ref JobHandle handle, ref NativeList<Tile> from, List<Tile> to) 
         {
             to.Clear();
             handle.Complete();
+            foreach(Tile t in from) { to.Add(t); }
+            from.Dispose();
+        }
 
-            for (int i = 0; i < from.Length; i++) { to.Add(from[i]); }
-
+        private void CompleteAndDispose(ref JobHandle handle, ref NativeHashSet<Tile> from, List<Tile> to)
+        {
+            to.Clear();
+            handle.Complete();
+            foreach (Tile t in from) { to.Add(t); }
             from.Dispose();
         }
 
@@ -347,6 +395,13 @@ namespace GridSystem
             return tile;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="tiles"></param>
+        /// <param name="tile"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
         private static Tile AddLateralEdgesTowardNeighbors(in Tile[] tiles, Tile tile, GridData data)
         {
             var directions = Tile.Directions_Lateral;
@@ -402,7 +457,7 @@ namespace GridSystem
             }
         }
 
-        /// <summary> Enables edges according to adjacents and their adjacents on Climb tiles</summary>
+        /// <summary> Adds edges to climb tiles. </summary>
         private static Tile HandleClimb(ref Tile[] tiles, Tile tile, GridData data)
         {
             if (Grid.GetIndex(tile + Tile.up, data, out int aboveIndex)) // Is there a tile above this one?

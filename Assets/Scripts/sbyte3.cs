@@ -57,6 +57,7 @@ namespace GridSystem
         public static implicit operator sbyte3(float3 f) { return new sbyte3((sbyte)f.x, (sbyte)f.y, (sbyte)f.z); }
 
         public static implicit operator int3(sbyte3 s) { return new int3(s.x, s.y, s.z); }
+        public override int GetHashCode() { return x * z + (y << 16); }
     }
 
     /// <summary>

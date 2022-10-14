@@ -2,7 +2,7 @@
 using Unity.Jobs;
 using Unity.Mathematics;
 
-namespace GridSystem
+namespace GridSystem.Jobs
 {
     [BurstCompatible]
     struct AStarPathJob : IJob

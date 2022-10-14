@@ -10,6 +10,7 @@ namespace GridSystem
         public Tile Target { get; }
         public JobType Type { get; }
         public int FieldRange { get; }
+        public int DropDepth { get; }
         public bool IncludeStart { get; }
         public int AgentId { get; }
 
@@ -19,7 +20,7 @@ namespace GridSystem
         /// <summary>
         /// Creates a new A* pathfinding job returning a path from start to target.
         /// </summary>
-        public GridJobItem(Tile start, Tile target, JobCompleteDelegate onComplete, int id, bool includeStart = false)
+        public GridJobItem(Tile start, Tile target, int dropDepth, JobCompleteDelegate onComplete, int id, bool includeStart = false)
         {
             Start = start;
             Target = target;
@@ -28,12 +29,13 @@ namespace GridSystem
             JobComplete = onComplete;
             AgentId = id;
             IncludeStart = includeStart;
+            DropDepth = dropDepth;
         }
 
         /// <summary>
         /// Creates a new Dijkstra pathfinding job returning all tiles within fieldRange from start.
         /// </summary>
-        public GridJobItem(Tile center, int fieldRange, JobCompleteDelegate onComplete, int id, bool includeStart = false)
+        public GridJobItem(Tile center, int fieldRange, int dropDepth, JobCompleteDelegate onComplete, int id, bool includeStart = false)
         {
             Start = center;
             Target = Tile.MaxValue;
@@ -42,6 +44,7 @@ namespace GridSystem
             JobComplete = onComplete;
             AgentId = id;
             IncludeStart = includeStart;
+            DropDepth = dropDepth;
         }
 
         public void Complete(in Tile[] tiles)

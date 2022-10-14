@@ -25,12 +25,12 @@ namespace GridSystem
 
         public void RequestPath(Tile target)
         {
-            MasterGrid.Request(new GridJobItem(Current, target, OnPathComplete, GetInstanceID()));
+            MasterGrid.Request(new GridJobItem(Current, target, 1, OnPathComplete, GetInstanceID()));
         }
 
         public void RequestField()
         {
-            MasterGrid.Request(new GridJobItem(Current, range, OnFieldComplete, GetInstanceID()));
+            MasterGrid.Request(new GridJobItem(Current, range, 1, OnFieldComplete, GetInstanceID()));
         }
     }
 }

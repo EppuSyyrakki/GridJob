@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
+using Unity.Collections;
 
 namespace GridSystem
-{
-	public struct Grid
+{    
+    public struct Grid
 	{
 		public static readonly float SQRT2 = 1.41421356f;
 		public static readonly float SQRT3 = 1.7320508f;
@@ -65,10 +66,11 @@ namespace GridSystem
 				Debug.Log(this + $" loaded {Tiles.Length} tiles from {s.x} * {s.y} * {s.z} in asset {asset.name}");
 			}
 		}
-		#endregion	
+        #endregion
 
         #region Public API
 
+        [BurstCompatible]
         public static Vector3 TileToWorld(Tile tile, GridData data)
 		{
 			var world = data.transformPosition + LocalPosition(tile, data) 
@@ -128,7 +130,7 @@ namespace GridSystem
 		{
 			Point axz = new Point(a.data.x, a.data.z), bxz = new Point(b.data.x, b.data.z);
 			Point axy = new Point(a.data.x, a.data.y), bxy = new Point(b.data.x, b.data.y);
-			int dist = math.max(DiagonalDistance(axz, bxz), DiagonalDistance(axy, bxy));
+			int dist = math.max(Point.DiagonalDistance(axz, bxz), Point.DiagonalDistance(axy, bxy));
             List<Point> xz = Line(axz, bxz, dist);
 			List<Point> xy = Line(axy, bxy, dist);            
 			List<Tile> result = new List<Tile>(dist);
@@ -155,7 +157,7 @@ namespace GridSystem
 			for (int step = 0; step <= dist; step++)
 			{
 				float t = dist == 0 ? 0f : (float)step / dist;
-				points.Add(Lerp(p0, p1, t));
+				points.Add(Point.Lerp(p0, p1, t));
 			}
 
 			return points;
@@ -236,7 +238,8 @@ namespace GridSystem
 			return index != -1;
         }
 
-		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
+
+		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>		
 		public static int GetIndex(Tile t, GridData data){ return GetIndex(t.data.x, t.data.y, t.data.z, data.size); }
 
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>
@@ -264,35 +267,45 @@ namespace GridSystem
 		public static bool HasTile(Tile t, GridData data) { return HasTile(t.data, data.size); }
         public static bool HasTile(Tile t, byte3 size) { return HasTile(t.data, size); }
         public static bool HasTile(sbyte3 d, byte3 size) { return GetIndex(d, size) != -1; }
+      
+        #endregion
+    }
 
-		private static Point Lerp(in Point a, in Point b, in float t)
-		{
-			return new Point(
-				math.round(Lerp(in a.q, in b.q, in t)),
-				math.round(Lerp(in a.r, in b.r, in t))
-				);
-		}
+    /// <summary>
+    /// Helper struct when using the line drawing algorithm in Linecast.
+    /// </summary>
+    internal struct Point : IEquatable<Point>
+    {
+        public readonly sbyte q, r;
+        public Point(sbyte q, sbyte r) { this.q = q; this.r = r; }
+        public Point(float q, float r) { this.q = (sbyte)math.round(q); this.r = (sbyte)math.round(r); }
+
+        public static Point Lerp(in Point a, in Point b, in float t)
+        {
+            return new Point(
+                math.round(Lerp(in a.q, in b.q, in t)),
+                math.round(Lerp(in a.r, in b.r, in t))
+                );
+        }
+
+        public static int DiagonalDistance(Point from, Point to)
+        {
+            return math.max(math.abs(to.q - from.q), math.abs(to.r - from.r));
+        }
 
         private static float Lerp(in sbyte a, in sbyte b, in float t)
         {
             return a + t * (b - a);
         }
 
-        private static int DiagonalDistance(Point from, Point to)
+		public override int GetHashCode()
 		{
-			return math.max(math.abs(to.q - from.q), math.abs(to.r - from.r));
-		}
+			return q + (r << 4);
+        }
 
-		/// <summary>
-		/// Helper struct when using the line drawing algorithm in Linecast.
-		/// </summary>
-		private struct Point
+		public bool Equals(Point other)
 		{
-			public readonly sbyte q, r;
-			public Point(sbyte q, sbyte r) { this.q = q; this.r = r; }
-			public Point(float q, float r) { this.q = (sbyte)math.round(q); this.r = (sbyte)math.round(r); }
+			return q == other.q && r == other.r;
 		}
-
-        #endregion
-    }
+	}
 }
