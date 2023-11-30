@@ -34,5 +34,16 @@
             if (e.Equals(Edge.Down)) { return Edge.Up; }
             return Edge.None;
         }
+
+        public static Cover Opposite(this Cover e)
+        {
+            if (e.Equals(Cover.North)) { return Cover.South; }
+            if (e.Equals(Cover.East)) { return Cover.West; }
+            if (e.Equals(Cover.South)) { return Cover.North; }
+            if (e.Equals(Cover.West)) { return Cover.East; }
+            if (e.Equals(Cover.Up)) { return Cover.Down; }
+            if (e.Equals(Cover.Down)) { return Cover.Up; }
+            return Cover.None;
+        }
     }
 }

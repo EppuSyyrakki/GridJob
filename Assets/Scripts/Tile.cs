@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using Unity.Mathematics;
 using Unity.Collections;
-using Unity.VisualScripting;
 
 namespace GridSystem
 {
@@ -93,7 +92,9 @@ namespace GridSystem
         [BurstCompatible]
         public Tile Rotate(float degrees)
         {
-            degrees = degrees % 360;
+            if (degrees == 0) { return this; }
+
+            degrees %= 360;
             if (degrees < 0) { degrees += 360;}
             float rad = degrees * DEG_TO_RAD;
             float cos = math.cos(rad), sin = math.sin(rad);
@@ -119,10 +120,12 @@ namespace GridSystem
         public bool HasAnyCover(Cover c) { return (covers & c) > 0; }
         public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
         public bool HasNoCover(Cover c) { return (covers & c) == 0; }
+        /// <summary> Check if this tile can be traversed through an edge. </summary>
         public bool HasPassageTo(Edge e) { return HasAnyEdge(e) && HasNoCover((Cover)e); }
+        /// <summary> Check if this tile can be traversed to another tile. </summary>
         public bool HasPassageTo(Tile other)
         {
-            Tile dir = this - other;
+            Tile dir = this - other;    // dir from other to this
             sbyte3 abs = dir.data.Abs;
 
             if (abs.x > 1 || abs.y > 1 || abs.z > 1) { return false; }  // other is non-adjacent 
@@ -181,6 +184,25 @@ namespace GridSystem
             return Edge.None;
         }
 
+        public static Cover DirectionToCover(Tile tile)
+        {
+            Tile n = tile.Normalized;
+            var directions = Directions_Cubic;
+
+            for (int i = 0; i < directions.Length; i++)
+            {
+                Cover current = (Cover)(1 << i);
+                if (n.Equals(directions[i])) { return current; }
+            }
+
+            if (tile.Equals(ne)) return Cover.North & Cover.East;
+            if (tile.Equals(se)) return Cover.South & Cover.East;
+            if (tile.Equals(nw)) return Cover.North & Cover.West;
+            if (tile.Equals(sw)) return Cover.South & Cover.West;
+
+            return Cover.None;
+        }
+
         public static (Tile t1, Tile t2) Adjacents(Tile dir)
         {
             dir = dir.Normalized;
@@ -237,6 +259,13 @@ namespace GridSystem
         public static Tile operator *(Tile a, int k)
         {
             a.data = new sbyte3(a.data.x * k, a.data.y * k, a.data.z * k);
+            return a;
+        }
+
+        /// <summary> NOTE: Copies node a data to new node. </summary>
+        public static Tile operator *(Tile a, float k)
+        {
+            a.data = new sbyte3((int)math.round(a.data.x * k), (int)math.round(a.data.y * k), (int)math.round(a.data.z * k));
             return a;
         }
 

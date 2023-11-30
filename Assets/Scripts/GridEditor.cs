@@ -106,24 +106,23 @@ namespace GridSystem
 
                 if (target.Equals(Tile.MaxValue)) { fov.Clear(); return; }
 
-                fov = GridMap.Linecast(start, target, TileType.MovableTypes);
-                Debug.DrawLine(Grid.TileToWorld(start, GridMap.Data), Grid.TileToWorld(target, GridMap.Data), Color.red, 10f);
+                GridMap.LineOfSight(start, target, out fov);
+                //fov = GridMap.Linecast(start, target, TileType.MovableTypes);
+                //Debug.DrawLine(Grid.TileToWorld(start, GridMap.Data), Grid.TileToWorld(target, GridMap.Data), Color.red, 10f);
                 return;
             }
 
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButton(0))
             {
                 Tile target = MouseCastTile();
 
                 if (target.Equals(Tile.MaxValue)) { return; }
 
-                if (jobType == JobType.Field 
-                    && ScheduleFieldJob(target, fieldRange))
+                if (jobType == JobType.Field && ScheduleFieldJob(target, fieldRange))
                 {
                     scheduled = JobType.Field;
                 }
-                else if (jobType == JobType.Path 
-                    && SchedulePathJob(start, target))
+                else if (jobType == JobType.Path && SchedulePathJob(start, target))
                 {
                     scheduled = JobType.Path;
                 }
@@ -131,8 +130,7 @@ namespace GridSystem
                 //{
                 //    StartCoroutine(DrawFov(start, target - start, 60f));
                 //}
-                else if (jobType == JobType.Fov
-                    && ScheduleFovJob(start, target - start, 60f))
+                else if (jobType == JobType.Fov && ScheduleFovJob(start, target - start, 90f))
                 {
                     scheduled = JobType.Fov;
                 }
@@ -150,10 +148,9 @@ namespace GridSystem
 
             for (float rotation = 1; rotation < angle; rotation++)
             {
-                Debug.Log(rotation);
                 Tile next = right.Rotate(rotation);
 
-                if (next.Equals(current)) 
+                if (math.cos(forward.Magnitude) < math.min(Data.cellSize.x, Data.cellSize.z)) 
                 {
                     Debug.DrawLine(Grid.TileToWorld(center, Data), Grid.TileToWorld(center + next, Data), Color.magenta, 20f);
                     continue;  // rotation wasn't enough to get a new end tile
@@ -260,7 +257,7 @@ namespace GridSystem
             var maxDistance = largest * 2 * GridMap.Data.diagonalCost;
             bool log = (helpers & Helpers.LogPathfinder) > 0;
 
-            if (log) { Debug.Log($"Attempting to Schedule Path Job: From {start} To {goal}"); }
+            if (log) { Debug.Log($"Scheduling Path Job: From {start} To {goal}. Heuristic: {mDist}"); }
 
             if (!Grid.HasTile(start, GridMap.Data) || !Grid.HasTile(goal, GridMap.Data)) { return false; }
 
@@ -275,7 +272,7 @@ namespace GridSystem
         {
             bool log = (helpers & Helpers.LogPathfinder) > 0;
 
-            if (log) { Debug.Log($"Attempting to schedule distance field job: From {center}, Dist: {fieldRange}"); }
+            if (log) { Debug.Log($"Scheduling distance field job: From {center}, Dist: {fieldRange}"); }
 
             if (!Grid.HasTile(center, GridMap.Data) 
                 || fieldRange > Mathf.Max(GridMap.Data.size.x, GridMap.Data.size.z)) { return false; }
@@ -303,7 +300,8 @@ namespace GridSystem
 
         private void CompleteAndDispose(ref JobHandle handle, ref NativeList<Tile> from, List<Tile> to) 
         {
-            to.Clear();
+            if (!Input.GetKeyDown(KeyCode.LeftShift)) { to.Clear(); ; }
+           
             handle.Complete();
             foreach(Tile t in from) { to.Add(t); }
             from.Dispose();
@@ -311,7 +309,8 @@ namespace GridSystem
 
         private void CompleteAndDispose(ref JobHandle handle, ref NativeHashSet<Tile> from, List<Tile> to)
         {
-            to.Clear();
+            if (!Input.GetKeyDown(KeyCode.LeftShift)) { to.Clear(); ; }
+
             handle.Complete();
             foreach (Tile t in from) { to.Add(t); }
             from.Dispose();

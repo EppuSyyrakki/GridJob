@@ -73,7 +73,7 @@ namespace GridSystem
         [BurstCompatible]
         public static Vector3 TileToWorld(Tile tile, GridData data)
 		{
-			var world = data.transformPosition + LocalPosition(tile, data) 
+			Vector3 world = data.transformPosition + LocalPosition(tile, data) 
 				+ new Vector3(data.cellSize.x * 0.5f, 0f, data.cellSize.z * 0.5f);
 			var worldOffset = new Vector3(world.x, world.y, world.z);
 			return worldOffset;
@@ -125,19 +125,62 @@ namespace GridSystem
 
 		#region TileCasts
 
-		public List<Tile> Linecast(Tile a, Tile b, 
+		public bool LineOfSight(Tile a, Tile b, TileType tileMask = TileType.All)
+		{
+			List<Tile> line = Linecast(a, b, tileMask);
+
+			if (line.Count == 0) { return false; }
+
+			Tile current = line[0];
+
+			for (int i = 1; i < line.Count; i++)
+			{
+				if (current.HasPassageTo(line[i])) 
+				{ 
+					current = line[i]; 
+				}
+				else { return false; }				
+			}
+
+			return true;
+        }
+
+        public bool LineOfSight(Tile a, Tile b, out List<Tile> seen, TileType tileMask = TileType.All)
+        {
+            List<Tile> line = Linecast(a, b, tileMask, true, true);
+			seen = new List<Tile>(); 
+
+            if (line.Count == 0) { return false; }
+
+            for (int i = 1; i < line.Count; i++)
+            {
+                if (line[i - 1].HasPassageTo(line[i])) 
+				{
+					seen.Add(line[i]);
+				}
+				else { return false; }				
+            }
+
+            return true;
+        }
+
+        public List<Tile> Linecast(Tile a, Tile b, 
 			TileType tileMask = TileType.All, bool stopOnMiss = true, bool includeA = false)
 		{
-			Point axz = new Point(a.data.x, a.data.z), bxz = new Point(b.data.x, b.data.z);
-			Point axy = new Point(a.data.x, a.data.y), bxy = new Point(b.data.x, b.data.y);
-			int dist = math.max(Point.DiagonalDistance(axz, bxz), Point.DiagonalDistance(axy, bxy));
+            Point axz = new(a.data.x, a.data.z);
+            Point bxz = new(b.data.x, b.data.z);
+            Point axy = new(a.data.x, a.data.y);
+            Point bxy = new(b.data.x, b.data.y);
+            int dist = math.max(Point.DiagonalDistance(axz, bxz), Point.DiagonalDistance(axy, bxy));
             List<Point> xz = Line(axz, bxz, dist);
 			List<Point> xy = Line(axy, bxy, dist);            
 			List<Tile> result = new List<Tile>(dist);
 
 			for (int i = includeA ? 0 : 1; i < xz.Count; i++)
 			{
-				sbyte x = xz[i].q, y = xy[i].r, z = xz[i].r;
+				sbyte x = xz[i].q;
+				sbyte y = xy[i].r; 
+				sbyte z = xz[i].r;
 				
 				if (!GetIndex(new Tile(x, y, z), Data, out int index)) { break; }
 
@@ -237,7 +280,6 @@ namespace GridSystem
 			index = GetIndex(t, data);
 			return index != -1;
         }
-
 
 		/// <summary> Calculates the index of a tile with the size. -1 if out of bounds.</summary>		
 		public static int GetIndex(Tile t, GridData data){ return GetIndex(t.data.x, t.data.y, t.data.z, data.size); }
