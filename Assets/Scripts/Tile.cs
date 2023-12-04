@@ -13,19 +13,15 @@ namespace GridSystem
         [SerializeField]
         public sbyte3 data;
         [SerializeField]
-        private TileType types;
-        [SerializeField]
-        public Edge edges;
-        [SerializeField]
-        public Cover covers;
+        public Walls walls;
         [SerializeField]
         public int index;
 
+        public bool occupied;
+
         #region Properties
-        public TileType Type => types;
-        public Edge Edges => edges;
-        public Cover Covers => covers;
-        public Tile Normalized => new Tile(data.Normalized, edges, covers, types, index);
+
+        public Tile Normalized => new(data.Normalized, walls, index);
         
         [BurstCompatible]
         public float Magnitude
@@ -39,58 +35,53 @@ namespace GridSystem
         #endregion
 
         #region Constructors
-        public Tile(int x, int y, int z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
+        public Tile(int x, int y, int z, Walls walls = new Walls(), int index = -1)
         {
             data = new sbyte3(x, y, z);
-            types = type;
-            this.edges = edges;
-            this.covers = covers;
-            this.index = index;            
+            this.walls = walls;
+            this.index = index;
+            occupied = false;
         }
 
-        public Tile(Vector3 v, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
+        public Tile(Vector3 v, Walls walls = new Walls(), int index = -1)
         {
             data = new sbyte3((sbyte)math.round(v.x), (sbyte)math.round(v.y), (sbyte)math.round(v.z));
-            types = type;
-            this.edges = edges;
-            this.covers = covers;
-            this.index = index;           
+            this.walls = walls;
+            this.index = index;
+            occupied = false;
         }
 
-        public Tile(float x, float y, float z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
+        public Tile(float x, float y, float z, Walls walls = new Walls(), int index = -1)
         {
             data = new sbyte3((sbyte)math.round(x), (sbyte)math.round(y), (sbyte)math.round(z));
-            types = type;
-            this.edges = edges;
-            this.covers = covers;
+            this.walls = walls;
             this.index = index;
+            occupied = false;
         }
 
-        public Tile(sbyte x, sbyte y, sbyte z, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
+        public Tile(sbyte x, sbyte y, sbyte z, Walls walls = new Walls(), int index = -1)
         {
             data = new sbyte3(x, y, z);
-            types = type;
-            this.edges = edges;
-            this.covers = covers;
+            this.walls = walls;
             this.index = index;
+            occupied = false;
         }
 
-        public Tile(sbyte3 data, Edge edges = Edge.None, Cover covers = Cover.None, TileType type = 0, int index = -1)
+        public Tile(sbyte3 data, Walls walls = new Walls(), int index = -1)
         {
             this.data = data;
-            types = type;
-            this.edges = edges;
-            this.covers = covers;
+            this.walls = walls;
             this.index = index;
+            occupied = false;
         }
         #endregion
 
-        #region Tile, Type and Edge operations
+        #region Helpers and operators
         /// <summary>
         /// Rotates a tile vector in 2D. Positive degrees rotate counter-clockwise.
         /// </summary>
         [BurstCompatible]
-        public Tile Rotate(float degrees)
+        public readonly Tile Rotate(float degrees)
         {
             if (degrees == 0) { return this; }
 
@@ -103,141 +94,107 @@ namespace GridSystem
                 data.y, 
                 (int)math.round(sin * data.x + cos * data.z));
         }
-        public void SetType(TileType t) { types = t; }
-        public void AddType(TileType t) { types |= t; }
-        public void RemoveType(TileType t) { types &= ~t; }
-        /// <summary> Returns true if tile has any same flags set as param types. </summary>
-        public bool IsAnyType(TileType types) { return (types & this.types) > 0; }
-        public void SetEdges(Edge e) { edges = e; }
-        public void SetCovers(Cover c) { covers = c; }
-        public void AddEdges(Edge e) { edges |= e; }
-        public void AddCovers(Cover c) { covers |= c; }
-        public void RemoveEdges(Edge e) { edges &= ~e; }
-        public void RemoveCovers(Cover c) { covers &= ~c; }
-        public void ToggleEdges(Edge e) { edges ^= e; }    
-        public void ToggleCovers(Cover c) { covers ^= c; }
-        public bool HasAnyEdge(Edge e) { return (edges & e) > 0; }
-        public bool HasAnyCover(Cover c) { return (covers & c) > 0; }
-        public bool HasNoEdge(Edge e) { return (edges & e) == 0 ; }
-        public bool HasNoCover(Cover c) { return (covers & c) == 0; }
-        /// <summary> Check if this tile can be traversed through an edge. </summary>
-        public bool HasPassageTo(Edge e) { return HasAnyEdge(e) && HasNoCover((Cover)e); }
-        /// <summary> Check if this tile can be traversed to another tile. </summary>
-        public bool HasPassageTo(Tile other)
-        {
-            Tile dir = this - other;    // dir from other to this
-            sbyte3 abs = dir.data.Abs;
-
-            if (abs.x > 1 || abs.y > 1 || abs.z > 1) { return false; }  // other is non-adjacent 
-
-            for (int i = 0; i < Directions_All.Length; i++) // i == 4 is at northeast
-            {
-                Edge current = (Edge)(1 << i);  // edge 1 << 4 is northeast
-
-                if (HasPassageTo(current) && dir.Equals(Directions_All[i] * -1)) // opposite 4 is sw
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         /// <summary>
         /// Convenience method that calculates if this tile is at the grid's edge.
         /// </summary>
         /// <returns>True if tile + dir would be outside the grid</returns>
-        public bool IsAtLimit(Tile dir, byte3 size)
+        public readonly bool IsAtLimit(Tile dir, byte3 size)
         {
-            return (dir.Equals(down) && data.y == 0)
-                    || (dir.Equals(up) && data.y == size.y - 1)
-                    || (dir.Equals(n) && data.z == size.z - 1)
-                    || (dir.Equals(e) && data.x == size.x - 1)
-                    || (dir.Equals(s) && data.z == 0)
-                    || (dir.Equals(w) && data.x == 0);
-        }                     
-
-        public static Tile EdgeToDirection(Edge e)
-        {
-            var directions = Directions_All;
-
-            for (int i = 0; i < directions.Length; i++)
-            {
-                Edge current = (Edge)(1 << i);
-                if ((e & current) == 0) { return directions[i]; }
-            }
-
-            return zero;
+            return (dir.Equals(Down) && data.y == 0)
+                    || (dir.Equals(Up) && data.y == size.y - 1)
+                    || (dir.Equals(N) && data.z == size.z - 1)
+                    || (dir.Equals(E) && data.x == size.x - 1)
+                    || (dir.Equals(S) && data.z == 0)
+                    || (dir.Equals(W) && data.x == 0);
         }
 
-        public static Edge DirectionToEdge(Tile tile)
+        /// <summary>
+        /// Checks for walls in this tile in provided direction. In diagonal directions, both adjacent direct walls must be clear.
+        /// Does not account for diagonal _movement_ as that is dependent on neighboring tiles.
+        /// </summary>
+        /// <param name="direction">The direction the check is performed towards.</param>
+        /// <returns>True if direction is clear, false if blocked.</returns>
+        public bool IsMovable(Tile direction)
         {
-            Tile n = tile.Normalized;
-            var directions = Directions_All;
-
-            for (int i = 0; i < directions.Length; i++)
-            {
-                Edge current = (Edge)(1 << i);
-                if (n.Equals(directions[i])) { return current; }
-            }
-
-            return Edge.None;
+            WallMask dir = DirectionToWallMask(direction.Normalized);
+            return (walls.GetMask(WallTypeMask.AllBlocked) & dir) == 0;
         }
 
-        public static Cover DirectionToCover(Tile tile)
+        /// <summary>
+        /// Converts a Wall enum to a direction Tile.
+        /// </summary>
+        /// <param name="wall"></param>
+        /// <returns>The normalized Tile struct.</returns>
+        public static Tile WallToDirection(Wall wall)
         {
-            Tile n = tile.Normalized;
-            var directions = Directions_Cubic;
-
-            for (int i = 0; i < directions.Length; i++)
+            for (int i = 0; i < Directions_Cubic.Length; i++)
             {
-                Cover current = (Cover)(1 << i);
-                if (n.Equals(directions[i])) { return current; }
+                if ((wall & (Wall)(1 << i)) == 0) { return Directions_Cubic[i]; }
             }
 
-            if (tile.Equals(ne)) return Cover.North & Cover.East;
-            if (tile.Equals(se)) return Cover.South & Cover.East;
-            if (tile.Equals(nw)) return Cover.North & Cover.West;
-            if (tile.Equals(sw)) return Cover.South & Cover.West;
-
-            return Cover.None;
+            return Zero;
         }
 
-        public static (Tile t1, Tile t2) Adjacents(Tile dir)
+        /// <summary>
+        /// Converts a Tile to a WallMask by normalizing it to a direction. Diagonal directions are converted to both their
+        /// single components.
+        /// </summary>
+        /// <param name="direction"></param>
+        /// <returns></returns>
+        public static WallMask DirectionToWallMask(Tile direction)
+        {
+            Tile t = direction.Normalized;
+
+            if (t.Equals(N)) { return WallMask.North; }
+            if (t.Equals(E)) { return WallMask.East; }
+            if (t.Equals(S)) { return WallMask.South; }
+            if (t.Equals(W)) { return WallMask.West; }
+            if (t.Equals(Up)) { return WallMask.Up; }
+            if (t.Equals(Down)) { return WallMask.Down; }
+            if (t.Equals(NE)) { return WallMask.NorthEast; }
+            if (t.Equals(SE)) { return WallMask.SouthEast; }
+            if (t.Equals(SW)) { return WallMask.SouthWest; }
+            if (t.Equals(NW)) { return WallMask.NorthWest; }
+
+            return WallMask.None;
+        }
+
+        public static (Tile left, Tile right) AdjacentDirections(Tile dir)
         {
             dir = dir.Normalized;
-            if (dir.Equals(n)) { return (ne, nw); }
-            if (dir.Equals(ne)) { return (n, e); }
-            if (dir.Equals(e)) { return (ne, se); }
-            if (dir.Equals(se)) { return (s, e); }
-            if (dir.Equals(s)) { return (se, sw); }
-            if (dir.Equals(sw)) { return (s, w); }
-            if (dir.Equals(w)) { return (sw, nw); }
-            if (dir.Equals(nw)) { return (n, w); }
+            if (dir.Equals(N)) { return (NW, NE); }
+            if (dir.Equals(NE)) { return (N, E); }
+            if (dir.Equals(E)) { return (NE, SE); }
+            if (dir.Equals(SE)) { return (E, S); }
+            if (dir.Equals(S)) { return (SE, SW); }
+            if (dir.Equals(SW)) { return (S, W); }
+            if (dir.Equals(W)) { return (SW, NW); }
+            if (dir.Equals(NW)) { return (W, N); }
             return (MaxValue, MaxValue);
         }
         #endregion
 
         #region Static directions
         // All and Cubic must be in the same order so casting from Edge to Cover in a loop works correctly
-        public static Tile[] Directions_All => new Tile[] { n, e, s, w, up, down, ne, se, sw, nw, };
-        public static Tile[] Directions_Cubic => new Tile[] { n, e, s, w, up, down };   
-        public static Tile[] Directions_Direct => new Tile[] { n, e, s, w };        
-        public static Tile[] Directions_Diagonal => new Tile[] { ne, se, sw, nw };
-        public static Tile[] Directions_Lateral => new Tile[] { n, e, s, w, ne, se, sw, nw };
-        public static Tile zero => new Tile(0, 0, 0);
-        public static Tile one => new Tile(1, 1, 1);
-        public static Tile n => new Tile(0, 0, 1);
-        public static Tile ne => new Tile(1, 0, 1);
-        public static Tile e => new Tile(1, 0, 0);
-        public static Tile se => new Tile(1, 0, -1);
-        public static Tile s => new Tile(0, 0, -1);
-        public static Tile sw => new Tile(-1, 0, -1);
-        public static Tile w => new Tile(-1, 0, 0);
-        public static Tile nw => new Tile(-1, 0, 1);
-        public static Tile up => new Tile(0, 1, 0);
-        public static Tile down => new Tile(0, -1, 0);
-        public static Tile MaxValue => new Tile(sbyte.MaxValue, sbyte.MaxValue, sbyte.MaxValue);
+        public static Tile[] Directions_All => new Tile[] { N, E, S, W, Up, Down, NE, SE, SW, NW, };
+        public static Tile[] Directions_Cubic => new Tile[] { N, E, S, W, Up, Down };   
+        public static Tile[] Directions_Direct => new Tile[] { N, E, S, W };        
+        public static Tile[] Directions_Diagonal => new Tile[] { NE, SE, SW, NW };
+        public static Tile[] Directions_Lateral => new Tile[] { N, E, S, W, NE, SE, SW, NW };
+        public static Tile Zero => new(0, 0, 0);
+        public static Tile One => new(1, 1, 1);
+        public static Tile N => new(0, 0, 1);
+        public static Tile NE => new(1, 0, 1);
+        public static Tile E => new(1, 0, 0);
+        public static Tile SE => new(1, 0, -1);
+        public static Tile S => new(0, 0, -1);
+        public static Tile SW => new(-1, 0, -1);
+        public static Tile W => new(-1, 0, 0);
+        public static Tile NW => new(-1, 0, 1);
+        public static Tile Up => new(0, 1, 0);
+        public static Tile Down => new(0, -1, 0);
+        public static Tile MaxValue => new(sbyte.MaxValue, sbyte.MaxValue, sbyte.MaxValue);
         #endregion
 
         #region Overrides and Interfaces
@@ -270,9 +227,9 @@ namespace GridSystem
         }
 
         /// <summary> NOTE: Copies node a data to new node. </summary>
-        public static Tile operator +(Tile a, Edge e)
+        public static Tile operator +(Tile a, Wall w)
         {
-            return a + EdgeToDirection(e);
+            return a + WallToDirection(w);
         }
 
         public static implicit operator Vector3(Tile t)
@@ -285,12 +242,12 @@ namespace GridSystem
             return data.GetHashCode();
         }
 
-        public override string ToString()
+        public override readonly string ToString()
         {
             return $"({data.x}, {data.y}, {data.z})";
         }
 
-        public bool Equals(Tile other)
+        public readonly bool Equals(Tile other)
         {
             return data.x == other.data.x && data.y == other.data.y && data.z == other.data.z;
         }

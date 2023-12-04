@@ -89,7 +89,7 @@ namespace GridSystem
                 Debug.Log("Operation time: " + (Time.realtimeSinceStartup - startTime) + " seconds");
             }
 
-            if (GUILayout.Button("Rebuild from existing data"))
+            if (GUILayout.Button("Auto build from existing data"))
             {
                 ge.RebuildExisting();
                 Repaint();
@@ -100,7 +100,7 @@ namespace GridSystem
 
             if (GUILayout.Button("Save to Asset"))
             {
-                if ((ge.Asset.Tiles.Length > 0) && EditorUtility.DisplayDialog("Overwrite asset?",
+                if (EditorUtility.DisplayDialog("Overwrite asset?",
                     "This will overwrite the Map Asset " + ge.Asset.name +
                     "This operation can't be undone.", "Overwrite", "Cancel"))
                 {
@@ -131,45 +131,52 @@ namespace GridSystem
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label("Selected Tile: " + original);
             if (GUILayout.Button("Select tile above current"))
-            {
-                Tile newTile = new Tile(original.data.x, original.data.y + 1, original.data.z);
-                
-                if (Grid.GetIndex(newTile, ge.GridMap.Data, out int index))
+            {              
+                if (Grid.GetIndex(ge.Selected + Tile.Up, ge.GridMap.Data, out int index))
                 {
                     ge.Selected = ge.GridMap.Tiles[index];
                     original = ge.Selected;
+                    edited = original;
                     SceneView.RepaintAll();
                 }               
             }
             EditorGUILayout.EndHorizontal();
             
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("Edges: ");
-            edited.SetEdges((Edge)EditorGUILayout.EnumFlagsField(original.Edges));
+            GUILayout.Label("Walls: ");
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("Covers: ");
-            edited.SetCovers((Cover)EditorGUILayout.EnumFlagsField(original.Covers));
+            GUILayout.Label("N:");
+            edited.walls.SetWall(Wall.North, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.North)));
+            GUILayout.Label("E:");
+            edited.walls.SetWall(Wall.East, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.East)));
+            GUILayout.Label("S:");
+            edited.walls.SetWall(Wall.South, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.South)));
+            GUILayout.Label("W:");
+            edited.walls.SetWall(Wall.West, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.West)));
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("Types: ");
-            edited.SetType((TileType)EditorGUILayout.EnumFlagsField(original.Type));
+            GUILayout.Label("Ceiling:");
+            edited.walls.SetWall(Wall.Up, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.Up)));
+            GUILayout.Label("Floor:");
+            edited.walls.SetWall(Wall.Down, (WallType)EditorGUILayout.EnumPopup(edited.walls.GetWall(Wall.Down)));
             EditorGUILayout.EndHorizontal();
 
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Update tile")) 
-            {
-                int i = EditorUtility.DisplayDialogComplex("Update tile", "Updating tile - select destination:",
+
+            if (GUILayout.Button("Update tile")) { UpdateTile(); }
+            if(GUILayout.Button("Cancel changes")) { edited = original; }
+        }
+
+        private void UpdateTile()
+        {
+            int i = EditorUtility.DisplayDialogComplex("Update tile", "Updating tile - select destination:",
                     "Grid only", "Grid and Asset", "Cancel");
 
-                if (i == 0) { ge.UpdateTile(edited, updateAsset: false); }
-                else if (i == 1) { ge.UpdateTile(edited, updateAsset: true); }
-                else { return; }
-            }
-            if(GUILayout.Button("Cancel changes")) { edited = original; }
-            EditorGUILayout.EndHorizontal();
+            if (i == 0) { ge.UpdateTile(edited, updateAsset: false); }
+            else if (i == 1) { ge.UpdateTile(edited, updateAsset: true); }
+            else { return; }
         }
     }
 }

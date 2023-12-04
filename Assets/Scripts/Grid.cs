@@ -39,7 +39,7 @@ namespace GridSystem
 				{
 					for (int x = 0; x < data.size.x; x++)
 					{
-						tiles[i] = new Tile(x, y, z, Edge.None, Cover.None, TileType.Empty, i);
+						tiles[i] = new Tile(x, y, z, new Walls(), i);
 						i++;
 					}
 				}
@@ -53,7 +53,10 @@ namespace GridSystem
 			}
 		}
 
-		public Grid(GridAsset asset, bool log = false)
+        /// <summary>
+        /// Creates a Grid object from a previously saved GridAsset. Total size must not exceed 65536 (128 * 128 * 4)
+        /// </summary>
+        public Grid(GridAsset asset, bool log = false)
 		{
 			Assert.IsTrue(asset.Data.EnsureSize());
 			tiles = new Tile[asset.Tiles.Length];
@@ -125,47 +128,7 @@ namespace GridSystem
 
 		#region TileCasts
 
-		public bool LineOfSight(Tile a, Tile b, TileType tileMask = TileType.All)
-		{
-			List<Tile> line = Linecast(a, b, tileMask);
-
-			if (line.Count == 0) { return false; }
-
-			Tile current = line[0];
-
-			for (int i = 1; i < line.Count; i++)
-			{
-				if (current.HasPassageTo(line[i])) 
-				{ 
-					current = line[i]; 
-				}
-				else { return false; }				
-			}
-
-			return true;
-        }
-
-        public bool LineOfSight(Tile a, Tile b, out List<Tile> seen, TileType tileMask = TileType.All)
-        {
-            List<Tile> line = Linecast(a, b, tileMask, true, true);
-			seen = new List<Tile>(); 
-
-            if (line.Count == 0) { return false; }
-
-            for (int i = 1; i < line.Count; i++)
-            {
-                if (line[i - 1].HasPassageTo(line[i])) 
-				{
-					seen.Add(line[i]);
-				}
-				else { return false; }				
-            }
-
-            return true;
-        }
-
-        public List<Tile> Linecast(Tile a, Tile b, 
-			TileType tileMask = TileType.All, bool stopOnMiss = true, bool includeA = false)
+        public List<Tile> Linecast(Tile a, Tile b, bool includeA = false)
 		{
             Point axz = new(a.data.x, a.data.z);
             Point bxz = new(b.data.x, b.data.z);
@@ -185,9 +148,7 @@ namespace GridSystem
 				if (!GetIndex(new Tile(x, y, z), Data, out int index)) { break; }
 
 				Tile tile = tiles[index];
-
-				if (tile.IsAnyType(tileMask)) { result.Add(tile); }
-				else if (stopOnMiss) { break; }
+				result.Add(tile); 
 			}
 
             return result;
@@ -210,62 +171,17 @@ namespace GridSystem
 
         #region Statics
 
-        /// <summary> Finds and returns a list of all tiles of types flagged in param types. </summary>
-        public static List<Tile> GetTilesOfType(in Tile[] tiles, TileType types)
-        {
-            List<Tile> list = new List<Tile>(tiles.Length);
-
-            for (int i = 0; i < tiles.Length; i++)
-            {
-                if (tiles[i].IsAnyType(types)) { list.Add(tiles[i]); }
-            }
-            return list;
-        }
-
-        /// <summary> Loops tiles and adds them to lists according to their type. </summary>
-        public static void GetTileTypes(in Tile[] tiles, TileType t1, TileType t2,
-            out List<Tile> l1, out List<Tile> l2)
-        {
-            l1 = new List<Tile>();
-            l2 = new List<Tile>();
-
-            for (int i = 0; i < tiles.Length; i++)
-            {
-                Tile tile = tiles[i];
-
-                if (tile.IsAnyType(t1)) { l1.Add(tile); }
-                else if (tile.IsAnyType(t2)) { l2.Add(tile); }
-            }
-        }
-
-        /// <summary> Loops tiles and adds them to lists according to their type. </summary>
-        public static void GetTileTypes(in Tile[] tiles, TileType t1, TileType t2, TileType t3,
-            out List<Tile> l1, out List<Tile> l2, out List<Tile> l3)
-        {
-            l1 = new List<Tile>();
-            l2 = new List<Tile>();
-            l3 = new List<Tile>();
-
-            for (int i = 0; i < tiles.Length; i++)
-            {
-                Tile tile = tiles[i];
-
-                if (tile.IsAnyType(t1)) { l1.Add(tile); }
-                else if (tile.IsAnyType(t2)) { l2.Add(tile); }
-                else if (tile.IsAnyType(t3)) { l3.Add(tile); }
-            }
-        }
-
         /// <summary> Node's location relative to the object owning this graph. </summary>
         public static Vector3 LocalPosition(Tile t, GridData data)
 		{
 			return new Vector3(t.data.x * data.cellSize.x, t.data.y * data.cellSize.y, t.data.z * data.cellSize.z);
 		}
 
-		/// <summary> Simple conversion from a direction to a cost. </summary>
+		/// <summary> Simple conversion from a direction to a cost. </summary>		
 		public static int Cost(Tile dir, GridData data)
 		{
-			if (dir.IsAnyType(TileType.Jump)) { return 0; }
+            // TODO: Handle jumping, climbing and dropping better, and possible unit-specific costs
+            if (dir.Equals(Tile.Down)) { return (int)(data.directCost * 0.5f); }
 			var d = dir.data.Normalized;
 			if (d.y > 0) { return data.upCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 1) { return data.directCost; }

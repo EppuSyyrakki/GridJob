@@ -1,5 +1,5 @@
-﻿using Unity.Jobs;
-using Unity.Collections;
+﻿using Unity.Collections;
+using Unity.Jobs;
 
 namespace GridSystem.Jobs
 {
@@ -17,9 +17,9 @@ namespace GridSystem.Jobs
         [ReadOnly]
         private NativeArray<Tile> tiles;
         [ReadOnly]
-        private int dropDepth;
-
-        private Heuristic comparer;
+        private readonly int dropDepth;
+        [ReadOnly]
+        private readonly int jumpHeight;
 
         [WriteOnly]
         private NativeList<Tile> result;
@@ -35,7 +35,7 @@ namespace GridSystem.Jobs
         /// <param name="includeStart">Include the center tile in the result list.</param>
         [BurstCompatible]
         public DijkstraFieldJob(Tile center, int range, NativeArray<Tile> tiles, NativeList<Tile> result, GridData data,
-            int dropDepth = 1, bool includeStart = false)
+            int dropDepth = 1, int jumpHeight = 0, bool includeStart = false)
         {
             this.center = center;
             maxCost = range * data.directCost;
@@ -43,15 +43,17 @@ namespace GridSystem.Jobs
             this.tiles = tiles;
             this.dropDepth = dropDepth;
             this.includeStart = includeStart;
-            this.result = result;
-            comparer = new Heuristic(center, data);
+            this.result = result;  
+            this.jumpHeight = jumpHeight;
         }
 
         [BurstCompatible]
         public void Execute()
         {
-            NativeArray<int> costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
-            NativeList<int> result = new NativeList<int>(maxCost * data.directCost, Allocator.Temp);
+            var comparer = new Heuristic(center, data);
+            var costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
+            var result = new NativeList<int>(maxCost * data.directCost, Allocator.Temp);
+            var neighbors = new NativeList<Tile>(10, Allocator.Temp);
             var frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, maxCost * maxCost, comparer);
             int examined = 0;
             int items = 0;
@@ -64,8 +66,8 @@ namespace GridSystem.Jobs
 
             while (frontier.Count > 0)
             {
-                var current = frontier.Pop();
-                NativeList<Tile> neighbors = GetNeighbors(current);
+                Tile current = frontier.Pop();
+                NeighborProcessor.GetNeighbors(current, data, in tiles, dropDepth, jumpHeight, ref neighbors);
 
                 for (int i = 0; i < neighbors.Length; i++)  // Loop through all available neighbors
                 {                         
@@ -77,7 +79,7 @@ namespace GridSystem.Jobs
                     {
                         result.Add(next.index);
                         items++;
-                        frontier.Insert(in next);
+                        frontier.Insert(next);
                         costSoFar[next.index] = costToNext;
                     }
                 }
@@ -90,54 +92,6 @@ namespace GridSystem.Jobs
                 int index = result[i];
                 this.result.Add(tiles[index]);
             }
-        }
-
-        /// <summary>
-        /// Returns only valid (movable) neighbor copies from the grid. Checks for node edges and grid limits.
-        /// </summary>
-        [BurstCompatible]
-        private NativeList<Tile> GetNeighbors(Tile tile)
-        {
-            var directions = new NativeList<Tile>(10, Allocator.Temp)
-            {   // These should be in the same order as the Edges enum for the bit-shift looping to work
-                Tile.n, Tile.e, Tile.s, Tile.w, Tile.up, Tile.down, Tile.ne, Tile.se, Tile.sw, Tile.nw,
-            };
-
-            var neighbors = new NativeList<Tile>(10, Allocator.Temp);
-
-            for (int i = 0; i < directions.Length; i++)
-            {
-                Edge current = (Edge)(1 << i);
-
-                if (tile.HasPassageTo(current))
-                {
-                    var neighbor = tiles[Grid.GetIndex(tile + directions[i], data.size)];
-
-                    if (neighbor.IsAnyType(TileType.Occupied)) { continue; }
-                    else if (neighbor.IsAnyType(TileType.Jump) && !CanDrop(neighbor)) { continue; }
-
-                    neighbors.Add(neighbor);
-                }
-            }
-
-            directions.Dispose();
-            return neighbors;
-        }
-
-        [BurstCompatible]
-        private bool CanDrop(Tile t)
-        {
-            for (int i = 0; i < dropDepth; i++)
-            {
-                if (Grid.GetIndex(t + Tile.down, data, out int belowIndex))
-                {
-                    t = tiles[belowIndex];
-
-                    if (t.IsAnyType(TileType.Jump)) { return false; }
-                }
-            }
-
-            return true;
-        }
+        }       
     }
 }
