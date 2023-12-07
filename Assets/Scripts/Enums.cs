@@ -48,6 +48,7 @@ namespace GridSystem
         Full = 1 << 2,
         Climbable = 1 << 3,
         All = Movable | Partial | Full | Climbable,
-        AllBlocked = Partial | Climbable | Full
+        AllBlocked = Partial | Climbable | Full,
+        AllVisible = Movable | Partial
     }
 }

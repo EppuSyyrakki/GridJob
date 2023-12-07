@@ -2413,7 +2413,7 @@ MonoBehaviour:
   helpers: 23
   gridColor: {r: 1, g: 1, b: 1, a: 0.07450981}
   selectedColor: {r: 0.5518868, g: 1, b: 0.5518868, a: 1}
-  jobType: 2
+  jobType: 1
   fieldRange: 4
   Data:
     size:

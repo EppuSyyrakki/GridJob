@@ -4,6 +4,7 @@ using UnityEngine;
 using Unity.Mathematics;
 using UnityEngine.Assertions;
 using Unity.Collections;
+using Unity.VisualScripting;
 
 namespace GridSystem
 {    
@@ -180,10 +181,10 @@ namespace GridSystem
 		/// <summary> Simple conversion from a direction to a cost. </summary>		
 		public static int Cost(Tile dir, GridData data)
 		{
-            // TODO: Handle jumping, climbing and dropping better, and possible unit-specific costs
-            if (dir.Equals(Tile.Down)) { return (int)(data.directCost * 0.5f); }
+            // TODO: Handle jumping, climbing and dropping better, and possible unit-specific costs            
 			var d = dir.data.Normalized;
-			if (d.y > 0) { return data.upCost; }
+            if (d.y < 0) { return (int)(data.directCost * 0.5f); }
+            if (d.y > 0) { return data.upCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 1) { return data.directCost; }
 			if (math.abs(d.x) + math.abs(d.z) == 2) { return data.diagonalCost; }
 

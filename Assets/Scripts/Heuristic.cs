@@ -33,7 +33,7 @@ namespace GridSystem
         public static int Manhattan(Tile a, Tile b, GridData data)
         {
             sbyte3 dist = a.data - b.data;
-            int height = dist.y > 0 ? data.upCost : data.directCost;
+            int height = dist.y > 0 ? data.upCost : (int)(data.directCost * 0.5f);
             return math.abs(data.diagonalCost * math.min(dist.x, dist.z))
                 + math.abs(data.directCost * math.max(dist.x, dist.z))
                 + math.abs(dist.y * height);

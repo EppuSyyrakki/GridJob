@@ -5,7 +5,7 @@ using Unity.Mathematics;
 namespace GridSystem.Jobs
 {
     [BurstCompatible]
-    struct AStarPathJob : IJob
+    struct AStarPathJob : IJob, IPathJob
     {
         [ReadOnly]
         private readonly bool includeStart;
@@ -26,6 +26,11 @@ namespace GridSystem.Jobs
 
         [WriteOnly]
         private NativeList<Tile> result;
+
+        public readonly NativeArray<Tile> Tiles => tiles;
+        public readonly GridData Data => data;
+        public readonly int DropDepth => dropDepth;
+        public readonly int JumpHeight => jumpHeight;
 
         /// <summary>
         /// Creates a pathfinding job using A*. 
@@ -60,7 +65,8 @@ namespace GridSystem.Jobs
             var cameFrom = new NativeArray<int>(tiles.Length, Allocator.Temp);
             var costSoFar = new NativeArray<int>(tiles.Length, Allocator.Temp);
             var neighbors = new NativeList<Tile>(10, Allocator.Temp);
-            var frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, frontierSize, comparer);            
+            var frontier = new NativeHeap<Tile, Heuristic>(Allocator.Temp, frontierSize, comparer);
+            var iPath = this as IPathJob;
             int examined = 0;
             bool complete = false;
 
@@ -90,7 +96,7 @@ namespace GridSystem.Jobs
                     break;
                 }
                 
-                NeighborProcessor.GetNeighbors(current, data, tiles, dropDepth, jumpHeight, ref neighbors); // Filter available neighbors           
+                iPath.GetNeighbors(current, ref neighbors); // Filter available neighbors           
 
                 while (neighbors.Length > 0)  // Loop through filtered neighbors
                 {
@@ -114,32 +120,24 @@ namespace GridSystem.Jobs
                 neighbors.Clear();
             }
 
-            if (!complete)
+            if (complete)
             {
-                Dispose();
-                return;
+                while (!current.Equals(start))
+                {
+                    result.Add(tiles[current.index]);
+                    current = tiles[cameFrom[current.index]];
+                }
+
+                if (includeStart)
+                {
+                    result.Add(start);
+                }
             }
 
-            while (!current.Equals(start))
-            {
-                result.Add(tiles[current.index]);
-                current = tiles[cameFrom[current.index]];
-            }
-
-            if (includeStart)
-            {
-                result.Add(start);
-            }
-
-            Dispose();
-
-            void Dispose()
-            {
-                frontier.Dispose();
-                costSoFar.Dispose();
-                cameFrom.Dispose();
-                neighbors.Dispose();
-            }
+            frontier.Dispose();
+            costSoFar.Dispose();
+            cameFrom.Dispose();
+            neighbors.Dispose();           
         }       
     }
 }

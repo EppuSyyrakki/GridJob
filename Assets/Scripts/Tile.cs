@@ -17,8 +17,6 @@ namespace GridSystem
         [SerializeField]
         public int index;
 
-        public bool occupied;
-
         #region Properties
 
         public Tile Normalized => new(data.Normalized, walls, index);
@@ -40,7 +38,6 @@ namespace GridSystem
             data = new sbyte3(x, y, z);
             this.walls = walls;
             this.index = index;
-            occupied = false;
         }
 
         public Tile(Vector3 v, Walls walls = new Walls(), int index = -1)
@@ -48,7 +45,6 @@ namespace GridSystem
             data = new sbyte3((sbyte)math.round(v.x), (sbyte)math.round(v.y), (sbyte)math.round(v.z));
             this.walls = walls;
             this.index = index;
-            occupied = false;
         }
 
         public Tile(float x, float y, float z, Walls walls = new Walls(), int index = -1)
@@ -56,7 +52,6 @@ namespace GridSystem
             data = new sbyte3((sbyte)math.round(x), (sbyte)math.round(y), (sbyte)math.round(z));
             this.walls = walls;
             this.index = index;
-            occupied = false;
         }
 
         public Tile(sbyte x, sbyte y, sbyte z, Walls walls = new Walls(), int index = -1)
@@ -64,7 +59,6 @@ namespace GridSystem
             data = new sbyte3(x, y, z);
             this.walls = walls;
             this.index = index;
-            occupied = false;
         }
 
         public Tile(sbyte3 data, Walls walls = new Walls(), int index = -1)
@@ -72,7 +66,6 @@ namespace GridSystem
             this.data = data;
             this.walls = walls;
             this.index = index;
-            occupied = false;
         }
         #endregion
 
@@ -122,6 +115,17 @@ namespace GridSystem
         }
 
         /// <summary>
+        /// Checks for walls in this tile in provided direction. In diagonal directions, one of adjacent direct walls must be clear.
+        /// </summary>
+        /// <param name="direction">The direction the check is performed towards.</param>
+        /// <returns>True if direction is visible, false if blocked.</returns>
+        public bool IsVisible(Tile direction)
+        {
+            WallMask dir = DirectionToWallMask(direction.Normalized);
+            return (int)(walls.GetMask(WallTypeMask.AllBlocked) & dir) <= 1;
+        }
+
+        /// <summary>
         /// Converts a Wall enum to a direction Tile.
         /// </summary>
         /// <param name="wall"></param>
@@ -130,7 +134,7 @@ namespace GridSystem
         {
             for (int i = 0; i < Directions_Cubic.Length; i++)
             {
-                if ((wall & (Wall)(1 << i)) == 0) { return Directions_Cubic[i]; }
+                if ((int)(wall & (Wall)(1 << i)) == 1) { return Directions_Cubic[i]; }
             }
 
             return Zero;
