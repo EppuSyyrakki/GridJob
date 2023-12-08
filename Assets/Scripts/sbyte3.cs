@@ -20,7 +20,7 @@ namespace GridSystem
             {
                 float m = Magnitude;
                 return new(math.round(x / m), math.round(y / m), math.round(z / m));
-                //sbyte nX = x, nY = y, nZ = z; // Old way doesn't really handle diagonals well.
+                //sbyte nX = x, nY = y, nZ = z; // This way doesn't really handle diagonals well.
 
                 //if (nX < -1) { nX = -1; }
                 //else if (nX > 1) { nX = 1; }

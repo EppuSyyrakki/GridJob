@@ -184,7 +184,7 @@ namespace GridSystem
             }
             else if (scheduled == JobType.Fov)
             {
-                // CompleteAndDispose(ref fovHandle, ref n_fovResult, fov);
+                CompleteAndDispose(ref fovHandle, ref n_fovResult, fov);
             }
 
             scheduled = JobType.None;        
@@ -273,15 +273,15 @@ namespace GridSystem
         {
             if (!Grid.HasTile(center, GridMap.Data)) { return false; }
 
-            //int cap = (int)forward.Magnitude * (int)(angleWidth / 2);
-            //n_fovResult = new NativeHashSet<Tile>(cap, Allocator.TempJob);
-            //start = center;
-            //var job = new FovJob(n_tiles, GridMap.Data, n_fovResult, start, forward, angleWidth);
-            //fovHandle = job.Schedule();
+            int cap = (int)forward.Magnitude * (int)(angleWidth / 2);
+            n_fovResult = new NativeHashSet<Tile>(cap, Allocator.TempJob);
+            start = center;
+            var job = new FovJob(n_tiles, GridMap.Data, n_fovResult, start, forward, angleWidth);
+            fovHandle = job.Schedule();
 
-            ShadowCast caster = new ShadowCast(GridMap.Tiles, Data);
-            StartCoroutine(caster.Cast(center, forward.Magnitude));
-
+            //ShadowCast caster = new ShadowCast(GridMap.Tiles, Data);
+            //StartCoroutine(caster.Cast(center, forward.Magnitude));
+            //fov = caster.Result;
             return true;
         }
 

@@ -17,6 +17,7 @@ namespace GridSystem
 		{
 			this.tiles = tiles;
 			this.data = data;
+			result = new List<Tile>();
 		}
 
 		public IEnumerator Cast(Tile center, float range)
@@ -130,34 +131,33 @@ namespace GridSystem
 							Debug.Log("BingPot!");
 						}
 
-						if (t.IsVisibleTo(toOrigin))
-						{
-                            if (math.abs(toOrigin.data.x) + math.abs(toOrigin.data.z) > 1)
+						if (t.IsVisibleTo(toOrigin))    // both cubic and diagonal cases require LOS from the original tile
+                        {
+                            if (toOrigin.IsCubic)
                             {
+                                // LOS is "straight" so the above visiblity check will do
+                                result.Add(tiles[index]);
+                                curBlocked = false;
+								c = Color.green;
+                            }
+                            else
+                            {
+                                // LOS is dependant not only on "t", but also on the neighboring tiles having visibility
                                 (Tile l, Tile r) = Tile.AdjacentDirections(toOrigin);
 
-                                if (Grid.GetIndex(t + l, data, out int li) && Grid.GetIndex(t + r, data, out int ri))
+                                // Either one or both of the adjacents has visibility toward origin
+                                if ((Grid.GetIndex(t + l, data, out int li) && tiles[li].IsVisibleTo(r))
+                                   || (Grid.GetIndex(t + r, data, out int ri) && tiles[ri].IsVisibleTo(l)))
                                 {
-                                    Tile left = tiles[li];
-                                    Tile right = tiles[ri];
-
-                                    if (left.IsVisibleTo(r) && right.IsVisibleTo(l))
-                                    {
-                                        // result.Add(tiles[index]);	
-                                        curBlocked = false;
-                                        c = Color.green;
-                                    }
+                                    result.Add(tiles[index]);
+                                    curBlocked = false;
+									c = Color.green;
                                 }
                             }
-							else
-							{
-								curBlocked = false;
-								c = Color.green;
-							}
-                        }					
-						
-						Debug.DrawLine(Grid.TileToWorld(t, data), Grid.TileToWorld(t + toOrigin, data), c, 10f);
-                        yield return new WaitForSeconds(0.1f);
+                        }
+
+                        Debug.DrawLine(Grid.TileToWorld(t, data), Grid.TileToWorld(t + toOrigin, data), c, 10f);
+                        yield return new WaitForSeconds(0.016f);
                     }
 
 					if (prevWasBlocked)

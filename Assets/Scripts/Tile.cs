@@ -108,7 +108,7 @@ namespace GridSystem
         /// <returns>True if direction is clear, false if blocked.</returns>
         public bool IsMovableTo(Tile direction)
         {
-            WallMask dir = DirectionToWallMask(direction.Normalized);
+            WallMask dir = DirectionToWallMask(direction);
             return (walls.GetMask(WallTypeMask.AllBlocked) & dir) == 0;
         }
 
@@ -119,8 +119,8 @@ namespace GridSystem
         /// <returns>True if direction is visible, false if blocked.</returns>
         public bool IsVisibleTo(Tile direction)
         {
-            WallMask dir = DirectionToWallMask(direction.Normalized);
-            return (int)(walls.GetMask(WallTypeMask.Full) & dir) <= 1;
+            WallMask dir = DirectionToWallMask(direction);
+            return (int)(walls.GetMask(WallTypeMask.AllVisionBlocked) & dir) <= 1;
         }
 
         /// <summary>
