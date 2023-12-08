@@ -19,17 +19,15 @@ namespace GridSystem
 
         #region Properties
 
-        public Tile Normalized => new(data.Normalized, walls, index);
-        
         [BurstCompatible]
-        public float Magnitude
-        {
-            get
-            {
-                var d = data.Abs;
-                return math.sqrt(math.pow(d.x, 2) + math.pow(d.y, 2) + math.pow(d.z, 2));
-            }
-        }
+        public Tile Normalized => new(data.Normalized, walls, index);
+        [BurstCompatible]
+        public readonly bool IsCubic => math.abs(data.x) + math.abs(data.y) + math.abs(data.z) <= 1;
+        [BurstCompatible]
+        public readonly bool IsCubicHorizontal => math.abs(data.x) + math.abs(data.z) <= 1;
+        [BurstCompatible]
+        public float Magnitude => data.Magnitude;
+
         #endregion
 
         #region Constructors
@@ -69,7 +67,7 @@ namespace GridSystem
         }
         #endregion
 
-        #region Helpers and operators
+        #region Helpers and operators       
         /// <summary>
         /// Rotates a tile vector in 2D. Positive degrees rotate counter-clockwise.
         /// </summary>
@@ -108,7 +106,7 @@ namespace GridSystem
         /// </summary>
         /// <param name="direction">The direction the check is performed towards.</param>
         /// <returns>True if direction is clear, false if blocked.</returns>
-        public bool IsMovable(Tile direction)
+        public bool IsMovableTo(Tile direction)
         {
             WallMask dir = DirectionToWallMask(direction.Normalized);
             return (walls.GetMask(WallTypeMask.AllBlocked) & dir) == 0;
@@ -119,10 +117,10 @@ namespace GridSystem
         /// </summary>
         /// <param name="direction">The direction the check is performed towards.</param>
         /// <returns>True if direction is visible, false if blocked.</returns>
-        public bool IsVisible(Tile direction)
+        public bool IsVisibleTo(Tile direction)
         {
             WallMask dir = DirectionToWallMask(direction.Normalized);
-            return (int)(walls.GetMask(WallTypeMask.AllBlocked) & dir) <= 1;
+            return (int)(walls.GetMask(WallTypeMask.Full) & dir) <= 1;
         }
 
         /// <summary>
@@ -150,7 +148,7 @@ namespace GridSystem
         {
             Tile t = direction.Normalized;
 
-            if (t.Equals(N)) { return WallMask.North; }
+            if (t.Equals(N)) { return WallMask.North; } // A little stupid wall of ifs but can't be arsed to open it
             if (t.Equals(E)) { return WallMask.East; }
             if (t.Equals(S)) { return WallMask.South; }
             if (t.Equals(W)) { return WallMask.West; }
@@ -160,7 +158,14 @@ namespace GridSystem
             if (t.Equals(SE)) { return WallMask.SouthEast; }
             if (t.Equals(SW)) { return WallMask.SouthWest; }
             if (t.Equals(NW)) { return WallMask.NorthWest; }
-
+            if (t.Equals(NUp)) { return WallMask.North | WallMask.Up; }
+            if (t.Equals(NDown)) { return WallMask.North | WallMask.Down; }
+            if (t.Equals(EUp)) { return WallMask.East | WallMask.Up; }
+            if (t.Equals(EDown)) { return WallMask.East | WallMask.Down; }
+            if (t.Equals(SUp)) { return WallMask.South | WallMask.Up; }
+            if (t.Equals(SDown)) { return WallMask.South | WallMask.Down; }
+            if (t.Equals(WUp)) { return WallMask.West | WallMask.Up; }
+            if (t.Equals(WDown)) { return WallMask.West | WallMask.Down; }
             return WallMask.None;
         }
 
@@ -198,6 +203,14 @@ namespace GridSystem
         public static Tile NW => new(-1, 0, 1);
         public static Tile Up => new(0, 1, 0);
         public static Tile Down => new(0, -1, 0);
+        public static Tile NUp => new(0, 1, 1);
+        public static Tile NDown => new(0, -1, 1);
+        public static Tile EUp => new (1, 1, 0);
+        public static Tile EDown => new(1, -1, 0);
+        public static Tile SUp => new(0, 1, -1);
+        public static Tile SDown => new(0, -1, -1);
+        public static Tile WUp => new(-1, 1, 0);
+        public static Tile WDown => new(-1, -1, 0);
         public static Tile MaxValue => new(sbyte.MaxValue, sbyte.MaxValue, sbyte.MaxValue);
         #endregion
 

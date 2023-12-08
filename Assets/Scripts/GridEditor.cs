@@ -18,7 +18,8 @@ namespace GridSystem
             DrawPathfinder = 1 << 1, 
             DrawResult = 1 << 2, 
             DrawAllTiles = 1 << 3, 
-            DrawSelectedTile = 1 << 4 }
+            DrawSelectedTile = 1 << 4 
+        }
 
         [SerializeField]
         private GridAsset asset;
@@ -183,7 +184,7 @@ namespace GridSystem
             }
             else if (scheduled == JobType.Fov)
             {
-                CompleteAndDispose(ref fovHandle, ref n_fovResult, fov);
+                // CompleteAndDispose(ref fovHandle, ref n_fovResult, fov);
             }
 
             scheduled = JobType.None;        
@@ -261,7 +262,7 @@ namespace GridSystem
                 || fieldRange > Mathf.Max(GridMap.Data.size.x, GridMap.Data.size.z)) { return false; }
 
             n_fieldResult = new NativeList<Tile>(fieldRange * fieldRange, Allocator.TempJob);
-            start = center;        
+            start = center;
             var job = new DijkstraFieldJob(center, fieldRange, n_tiles, n_fieldResult, GridMap.Data, dropDepth, jumpHeight, false);
             fieldHandle = job.Schedule();
 
@@ -270,13 +271,16 @@ namespace GridSystem
 
         private bool ScheduleFovJob(Tile center, Tile forward, float angleWidth)
         {
-            //if (!Grid.HasTile(center, GridMap.Data)) { return false; }
+            if (!Grid.HasTile(center, GridMap.Data)) { return false; }
 
             //int cap = (int)forward.Magnitude * (int)(angleWidth / 2);
             //n_fovResult = new NativeHashSet<Tile>(cap, Allocator.TempJob);
             //start = center;
             //var job = new FovJob(n_tiles, GridMap.Data, n_fovResult, start, forward, angleWidth);
             //fovHandle = job.Schedule();
+
+            ShadowCast caster = new ShadowCast(GridMap.Tiles, Data);
+            StartCoroutine(caster.Cast(center, forward.Magnitude));
 
             return true;
         }
@@ -342,35 +346,42 @@ namespace GridSystem
         private static Walls RaycastWalls(Tile tile, GridData data, bool includeTriggers = false)
         {
             Vector3 pos = Grid.TileToWorld(tile, data);
-            Vector3 low = pos + 0.3333f * data.cellSize.y * Vector3.up;
-            Vector3 high = pos + 0.6666f * data.cellSize.y * Vector3.up;
+            Vector3 mid = pos + 0.5f * data.cellSize.y * Vector3.up;
             var interaction = includeTriggers ? QueryTriggerInteraction.Collide : QueryTriggerInteraction.Ignore;
             var directions = Tile.Directions_Cubic;
             Walls walls = new();
 
-            for (int i = 0; i < directions.Length; i++)
+            if (Physics.CheckBox(mid, data.cellSize * 0.3f, Quaternion.identity, data.blockedLayers, interaction))
             {
-                var dir = directions[i];
-                float distance = dir.data.y == 0 ? data.cellSize.x : data.cellSize.y;
-                var hits = Physics.RaycastAll(high, dir, distance, data.AllLayers, interaction);
-
-                for (int j = 0; j < hits.Length; j++)
+                walls.SetMask(WallMask.All, WallType.Full);
+            }
+            else
+            {
+                for (int i = 0; i < directions.Length; i++)
                 {
-                    if ((1 << hits[j].collider.gameObject.layer & data.blockedLayers) > 0)
+                    var dir = directions[i];
+                    float distance = dir.data.y == 0 ? data.cellSize.x : data.cellSize.y;
+                    var hits = Physics.RaycastAll(mid, dir, distance, data.AllLayers, interaction);
+
+                    for (int j = 0; j < hits.Length; j++)
                     {
-                        Debug.DrawLine(high, high + dir * distance, Color.red, 5f);
-                        walls.SetByIndex(i, WallType.Full);
+                        if ((1 << hits[j].collider.gameObject.layer & data.blockedLayers) > 0)
+                        {
+                            Debug.DrawLine(mid, mid + dir * distance, Color.red, 5f);
+                            walls.SetByIndex(i, WallType.Full);
+                        }
+
+                        if ((1 << hits[j].collider.gameObject.layer & data.climbLayers) > 0)
+                        {
+                            Debug.DrawLine(mid, mid + dir * distance, Color.yellow, 5f);
+                            walls.SetByIndex(i, WallType.Climbable);
+                            break;
+                        }
                     }
 
-                    if ((1 << hits[j].collider.gameObject.layer & data.climbLayers) > 0)
-                    {
-                        Debug.DrawLine(high, high + dir * distance, Color.yellow, 5f);
-                        walls.SetByIndex(i, WallType.Climbable);
-                    }                    
+                    // TODO: Set boundary tiles (next to end of map) to full wall
+                    // TODO: Some way to enter "movable" walls like windows, big holes and low obstacles
                 }
-
-                // TODO: Set boundary tiles (next to end of map) to full wall
-                // TODO: Some way to enter "movable" walls like windows, big holes and low obstacles
             }
 
             return walls;

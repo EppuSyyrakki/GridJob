@@ -86,20 +86,20 @@ namespace GridSystem.Jobs
                 // Diagonal direction
                 (Tile left, Tile right) = Tile.AdjacentDirections(dir);
 
-                if (tile.IsMovable(left) && tile.IsMovable(right))
+                if (tile.IsMovableTo(left) && tile.IsMovableTo(right))
                 {
                     // Direct walls are clear, check adjacents for their inverse walls.
                     if (Grid.GetIndex(tile + left, Data, out int leftIndex) 
                         && Grid.GetIndex(tile + right, Data, out int rightIndex))
                     {
-                        return Tiles[leftIndex].IsMovable(right) && Tiles[rightIndex].IsMovable(left);
+                        return Tiles[leftIndex].IsMovableTo(right) && Tiles[rightIndex].IsMovableTo(left);
                     }
                 }
 
                 return false;
             }
 
-            return tile.IsMovable(dir);                         
+            return tile.IsMovableTo(dir);                         
         }
 
         [BurstCompatible]

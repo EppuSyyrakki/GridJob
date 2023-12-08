@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -17,19 +18,29 @@ namespace GridSystem
         {
             get
             {
-                sbyte nX = x, nY = y, nZ = z;
+                float m = Magnitude;
+                return new(math.round(x / m), math.round(y / m), math.round(z / m));
+                //sbyte nX = x, nY = y, nZ = z; // Old way doesn't really handle diagonals well.
 
-                if (nX < -1) { nX = -1; }
-                else if (nX > 1) { nX = 1; }
+                //if (nX < -1) { nX = -1; }
+                //else if (nX > 1) { nX = 1; }
 
-                if (nY < -1) { nY = -1; }
-                else if (nY > 1) { nY = 1; }
+                //if (nY < -1) { nY = -1; }
+                //else if (nY > 1) { nY = 1; }
 
-                if (nZ < -1) { nZ = -1; }
-                else if (nZ > 1) { nZ = 1; }
+                //if (nZ < -1) { nZ = -1; }
+                //else if (nZ > 1) { nZ = 1; }
 
-                return new sbyte3(nX, nY, nZ);
+                //return new sbyte3(nX, nY, nZ);
             }
+        }
+
+        [BurstCompatible]
+        public float Magnitude 
+        { get
+            {
+                return math.sqrt(x * x + y * y + z * z);
+            } 
         }
 
         public sbyte3 Abs
@@ -47,6 +58,7 @@ namespace GridSystem
         }
 
         public sbyte3(int x, int y, int z) { this.x = (sbyte)x; this.y = (sbyte)y; this.z = (sbyte)z; }
+        public sbyte3(float x, float y, float z) { this.x = (sbyte)x; this.y = (sbyte)y; this.z = (sbyte)z; }
 
         public static sbyte3 operator +(sbyte3 a, sbyte3 b) { return new sbyte3(a.x + b.x, a.y + b.y, a.z + b.z); }
 
